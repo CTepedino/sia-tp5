@@ -43,7 +43,12 @@ Font3 = [
     [0x08, 0x15, 0x02, 0x00, 0x00, 0x00, 0x00],
     [0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f]
 ]
-
+font3_chars = [
+    "`", "a", "b", "c", "d", "e", "f", "g",
+    "h", "i", "j", "k", "l", "m", "n", "o",
+    "p", "q", "r", "s", "t", "u", "v", "w",
+    "x", "y", "z", "{", "|", "}", "~", "DEL"
+]
 # Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
@@ -73,12 +78,15 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 
     # Guardar parámetros en JSON
     params = {
-        "layers": [35, 12, 2, 12, 35],
-        "learning_rate": 0.0043,
+        "layers": [35, 11, 2, 11, 35],
+        "learning_rate": 0.0037,
         "function": "sigmoid",
         "optimizer": "adam",
         "epochs": epochs
     }
+
+    capa_latente = len(params["layers"]) // 2
+    print(f"Capa latente: {capa_latente}")
     
     capa_latente = len(params["layers"]) // 2
     
@@ -101,7 +109,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
             reconstruida = ae.test(letra)
             error_letra = sum(abs(np.array(letra) - (np.array(reconstruida) > 0.5).astype(int)))
             errores_por_letra.append(error_letra)
-            log_and_print(f"Letra {idx}: Error: {error_letra}", f)
+            log_and_print(f"Letra {font3_chars[idx]}: Error: {error_letra}", f)
 
         log_and_print(f"Error máximo por letra: {max(errores_por_letra)}", f)
         log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
@@ -135,9 +143,12 @@ def entrenar_autoencoder(results_directory, epochs=5000):
             z_list.append(activaciones[capa_latente])
 
         z = np.array(z_list)
+        # z_min = z.min(axis=0)
+        # z_max = z.max(axis=0)
+        # z_norm = (z - z_min) / (z_max - z_min)
         plt.scatter(z[:, 0], z[:, 1])
         for i in range(len(z)):
-            plt.annotate(str(i), (z[i, 0], z[i, 1]))
+            plt.annotate(font3_chars[i], (z[i, 0], z[i, 1]))
         plt.title("Representación en el espacio latente (2D)")
         plt.grid(True)
         # Guardar el gráfico
