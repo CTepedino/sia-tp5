@@ -80,6 +80,8 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         "epochs": epochs
     }
     
+    capa_latente = len(params["layers"]) // 2
+    
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
 
@@ -130,7 +132,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         z_list = []
         for letra in letras:
             _, activaciones = ae.forward_propagation(letra)
-            z_list.append(activaciones[3])
+            z_list.append(activaciones[capa_latente])
 
         z = np.array(z_list)
         plt.scatter(z[:, 0], z[:, 1])
@@ -145,4 +147,4 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=100000)  # Reducimos el número de épocas
+    entrenar_autoencoder(results_directory, epochs=50000)  # Reducimos el número de épocas
