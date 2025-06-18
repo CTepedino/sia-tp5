@@ -1,4 +1,5 @@
-import math 
+import math
+import numpy as np
 
 def step(x):
     return 1 if x >= 0 else -1
@@ -17,10 +18,10 @@ def hyperbolic_tangent_derivative(x):
 def sigmoid(x):
     # Versión numéricamente estable de sigmoid
     if x >= 0:
-        z = math.exp(-x)
+        z = np.exp(-x)
         return 1 / (1 + z)
     else:
-        z = math.exp(x)
+        z = np.exp(x)
         return z / (1 + z)
 
 def sigmoid_derivative(x):

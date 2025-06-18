@@ -44,6 +44,14 @@ Font3 = [
     [0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f]
 ]
 
+# Array de caracteres correspondiente a cada patrón de Font3
+font3_chars = [
+    "`", "a", "b", "c", "d", "e", "f", "g",
+    "h", "i", "j", "k", "l", "m", "n", "o",
+    "p", "q", "r", "s", "t", "u", "v", "w",
+    "x", "y", "z", "{", "|", "}", "~", "DEL"
+]
+
 # Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
@@ -68,15 +76,14 @@ def log_and_print(msg, file):
 
 def entrenar_autoencoder(results_directory, epochs=5000):
     letras = font_to_binary_patterns()
-    # Elegir la función de activación por nombre
     activador, activador_deriv = non_linear_functions["sigmoid"]
 
-    # Guardar parámetros en JSON
     params = {
+        # "layers": [35, 18, 6, 2, 6, 18, 35],
         "layers": [35, 12, 2, 12, 35],
         "learning_rate": 0.0043,
         "function": "sigmoid",
-        "optimizer": "adam",
+        "optimizer": "momentum",
         "epochs": epochs
     }
     
@@ -90,7 +97,8 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         activator_derivative=activador_deriv,
         optimizer=params["optimizer"]
     )
-
+    capa_latente = len(params["layers"]) // 2 + 1
+    print(f"Capa latente: {capa_latente}")
     ae.train(letras, letras, epochs=epochs)
 
     with open(os.path.join(results_directory, "result.txt"), "w") as f:
@@ -99,50 +107,65 @@ def entrenar_autoencoder(results_directory, epochs=5000):
             reconstruida = ae.test(letra)
             error_letra = sum(abs(np.array(letra) - (np.array(reconstruida) > 0.5).astype(int)))
             errores_por_letra.append(error_letra)
-            log_and_print(f"Letra {idx}: Error: {error_letra}", f)
+            log_and_print(f"Letra {font3_chars[idx]}: Error: {error_letra}", f)
 
-        log_and_print(f"Error máximo por letra: {max(errores_por_letra)}", f)
+        log_and_print(f"Error máximo por letra: {max(errores_por_letra):.6f}", f)
         log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
 
         # Gráfico de barras de distribución de errores
         error_counts = Counter(errores_por_letra)
-        
         plt.figure(figsize=(10, 6))
         errors = sorted(error_counts.keys())
         counts = [error_counts[error] for error in errors]
-        
         plt.bar(errors, counts)
         plt.xlabel('Error (píxeles)')
         plt.ylabel('Cantidad de letras')
         plt.title('Distribución de errores por letra')
         plt.xticks(errors)
         plt.grid(True, alpha=0.3)
-        
-        # Agregar etiquetas de valor en las barras
         for i, (error, count) in enumerate(zip(errors, counts)):
             plt.text(error, count + 0.1, str(count), ha='center', va='bottom')
-        
         plt.tight_layout()
         plt.savefig(os.path.join(results_directory, "distribucion_errores.png"))
         plt.show()
 
         # Visualizamos espacio latente
+        print(f"Capa latente: {capa_latente}")
         z_list = []
         for letra in letras:
             _, activaciones = ae.forward_propagation(letra)
-            z_list.append(activaciones[3])
+            z_list.append(activaciones[capa_latente])
 
         z = np.array(z_list)
-        plt.scatter(z[:, 0], z[:, 1])
-        for i in range(len(z)):
-            plt.annotate(str(i), (z[i, 0], z[i, 1]))
+        # Guardar los resultados de la capa latente en un archivo CSV (sin normalizar)
+        with open(os.path.join(results_directory, "latentes.csv"), "w") as lat_file:
+            lat_file.write("caracter,latente_x,latente_y\n")
+            for i, vec in enumerate(z):
+                lat_file.write(f"{font3_chars[i]},{vec[0]},{vec[1]}\n")
+        # Normalizar a rango [0, 1] para mejor visualización
+        z_min = z.min(axis=0)
+        z_max = z.max(axis=0)
+        z_norm = (z - z_min) / (z_max - z_min)
+        # Guardar los resultados normalizados de la capa latente en un archivo CSV
+        with open(os.path.join(results_directory, "latentes_normalizados.csv"), "w") as lat_file:
+            lat_file.write("caracter,latente_x,latente_y\n")
+            for i, vec in enumerate(z_norm):
+                lat_file.write(f"{font3_chars[i]},{vec[0]},{vec[1]}\n")
+
+        plt.figure(figsize=(10, 8))
+        plt.scatter(z_norm[:, 0], z_norm[:, 1])
+        for i in range(len(z_norm)):
+            plt.annotate(font3_chars[i], (z_norm[i, 0], z_norm[i, 1]))
         plt.title("Representación en el espacio latente (2D)")
+        plt.xlabel("Dimensión latente 1 (normalizada)")
+        plt.ylabel("Dimensión latente 2 (normalizada)")
+        # plt.xlim(-0.1, 1.1)
+        # plt.ylim(-0.1, 1.1)
         plt.grid(True)
-        # Guardar el gráfico
         plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
         plt.show()
 
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=100000)  # Reducimos el número de épocas
+    entrenar_autoencoder(results_directory, epochs=50000)  # Reducimos el número de épocas
