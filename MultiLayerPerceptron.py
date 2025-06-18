@@ -26,7 +26,7 @@ class MultiLayerPerceptron:
 
         self.min_error = None
         self.best_weights = None
-        self.patience = 5000
+        self.patience = 8000
         self.patience_counter = 0
 
         # Parámetros para ADAM
