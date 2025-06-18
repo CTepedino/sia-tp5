@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from activatorFunctions import non_linear_functions
 import os
 from datetime import datetime
+import json
+from collections import Counter
 
 
 # El Font3 original en decimal (cada número representa una fila de 5 bits)
@@ -69,12 +71,24 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     # Elegir la función de activación por nombre
     activador, activador_deriv = non_linear_functions["sigmoid"]
 
+    # Guardar parámetros en JSON
+    params = {
+        "layers": [35, 12, 2, 12, 35],
+        "learning_rate": 0.0043,
+        "function": "sigmoid",
+        "optimizer": "adam",
+        "epochs": epochs
+    }
+    
+    with open(os.path.join(results_directory, "params.json"), "w") as f:
+        json.dump(params, f, indent=4)
+
     ae = MultiLayerPerceptron(
-        layers=[35, 15, 2, 15, 35], 
-        learning_rate=0.005,
+        layers=params["layers"],
+        learning_rate=params["learning_rate"],
         activator_function=activador,
         activator_derivative=activador_deriv,
-        optimizer="adam"
+        optimizer=params["optimizer"]
     )
 
     ae.train(letras, letras, epochs=epochs)
@@ -87,14 +101,36 @@ def entrenar_autoencoder(results_directory, epochs=5000):
             errores_por_letra.append(error_letra)
             log_and_print(f"Letra {idx}: Error: {error_letra}", f)
 
-        log_and_print("Error máximo por letra: " + str(max(errores_por_letra)), f)
-        log_and_print("Error promedio por letra: " + str(np.mean(errores_por_letra)), f)
+        log_and_print(f"Error máximo por letra: {max(errores_por_letra)}", f)
+        log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
+
+        # Gráfico de barras de distribución de errores
+        error_counts = Counter(errores_por_letra)
+        
+        plt.figure(figsize=(10, 6))
+        errors = sorted(error_counts.keys())
+        counts = [error_counts[error] for error in errors]
+        
+        plt.bar(errors, counts)
+        plt.xlabel('Error (píxeles)')
+        plt.ylabel('Cantidad de letras')
+        plt.title('Distribución de errores por letra')
+        plt.xticks(errors)
+        plt.grid(True, alpha=0.3)
+        
+        # Agregar etiquetas de valor en las barras
+        for i, (error, count) in enumerate(zip(errors, counts)):
+            plt.text(error, count + 0.1, str(count), ha='center', va='bottom')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(results_directory, "distribucion_errores.png"))
+        plt.show()
 
         # Visualizamos espacio latente
         z_list = []
         for letra in letras:
             _, activaciones = ae.forward_propagation(letra)
-            z_list.append(activaciones[3])  # capa latente
+            z_list.append(activaciones[3])
 
         z = np.array(z_list)
         plt.scatter(z[:, 0], z[:, 1])
