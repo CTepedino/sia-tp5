@@ -97,7 +97,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         activator_derivative=activador_deriv,
         optimizer=params["optimizer"]
     )
-    capa_latente = len(params["layers"]) // 2 + 1
+    capa_latente = len(params["layers"]) // 2
     print(f"Capa latente: {capa_latente}")
     ae.train(letras, letras, epochs=epochs)
 
