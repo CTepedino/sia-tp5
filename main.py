@@ -80,8 +80,8 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 
     params = {
         # "layers": [35, 18, 6, 2, 6, 18, 35],
-        "layers": [35, 12, 2, 12, 35],
-        "learning_rate": 0.0043,
+        "layers": [35, 20, 2, 20, 35],
+        "learning_rate": 0.0024,
         "function": "sigmoid",
         "optimizer": "momentum",
         "epochs": epochs
@@ -168,4 +168,4 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=50000)  # Reducimos el número de épocas
+    entrenar_autoencoder(results_directory, epochs=100000)  # Reducimos el número de épocas
