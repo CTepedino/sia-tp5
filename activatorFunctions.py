@@ -15,7 +15,13 @@ def hyperbolic_tangent_derivative(x):
 
 
 def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
+    # Versión numéricamente estable de sigmoid
+    if x >= 0:
+        z = math.exp(-x)
+        return 1 / (1 + z)
+    else:
+        z = math.exp(x)
+        return z / (1 + z)
 
 def sigmoid_derivative(x):
     s = sigmoid(x)

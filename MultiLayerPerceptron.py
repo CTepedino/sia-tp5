@@ -26,7 +26,7 @@ class MultiLayerPerceptron:
 
         self.min_error = None
         self.best_weights = None
-        self.patience = 50
+        self.patience = 5000
         self.patience_counter = 0
 
         # Parámetros para ADAM
@@ -160,7 +160,8 @@ class MultiLayerPerceptron:
                 output = activations[-1]
                 self.back_propagation(y, hidden_states, activations)
 
-                error += 0.5 * np.sum((np.array(y) - output) ** 2)
+                #error += 0.5 * np.sum((np.array(y) - output) ** 2)
+                error += np.mean((np.array(y) - output) ** 2)
 
             average_error = error / len(training_set)
             error_history.append(average_error)

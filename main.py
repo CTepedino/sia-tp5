@@ -54,21 +54,6 @@ def font_to_binary_patterns():
     return patterns
 
 
-# Funciones de activación
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-def sigmoid_deriv(x):
-    s = sigmoid(x)
-    return s * (1 - s)
-
-# Función de activación ReLU
-def relu(x):
-    return np.maximum(0, x)
-
-def relu_deriv(x):
-    return (x > 0).astype(float)
-
 def contar_error_pixel(x, x_hat, umbral=0.5):
     errores = 0
     for orig, recon in zip(x, x_hat):
@@ -79,20 +64,20 @@ def log_and_print(msg, file):
     print(msg)
     file.write(str(msg) + '\n')
 
-def entrenar_autoencoder(results_directory):
+def entrenar_autoencoder(results_directory, epochs=5000):
     letras = font_to_binary_patterns()
     # Elegir la función de activación por nombre
-    activador, activador_deriv = non_linear_functions["sigmoid"]  # o "sigmoid", "tanh", etc.
+    activador, activador_deriv = non_linear_functions["sigmoid"]
 
     ae = MultiLayerPerceptron(
-        layers=[35, 10, 2, 10, 35],
-        learning_rate=0.02,
+        layers=[35, 15, 2, 15, 35], 
+        learning_rate=0.005,
         activator_function=activador,
         activator_derivative=activador_deriv,
         optimizer="adam"
     )
 
-    ae.train(letras, letras, epochs=5000)
+    ae.train(letras, letras, epochs=epochs)
 
     with open(os.path.join(results_directory, "result.txt"), "w") as f:
         errores_por_letra = []
@@ -124,4 +109,4 @@ def entrenar_autoencoder(results_directory):
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory)
+    entrenar_autoencoder(results_directory, epochs=100000)  # Reducimos el número de épocas
