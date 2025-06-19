@@ -1,5 +1,5 @@
 import numpy as np
-from MultiLayerPerceptron import MultiLayerPerceptron
+from multilayer_perceptron_autoencoder import MultiLayerPerceptron
 import matplotlib.pyplot as plt
 from activatorFunctions import non_linear_functions
 import os
@@ -122,7 +122,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     weights_dir = 'weights'
     os.makedirs(weights_dir, exist_ok=True)
     arch_str = '-'.join(str(x) for x in params["layers"])
-    weights_path = os.path.join(weights_dir, f"MLP_{arch_str}.npy")
+    weights_path = os.path.join(weights_dir, f"MLP_{arch_str}_autoencoder.npy")
 
     # Crear el modelo
     ae = MultiLayerPerceptron(

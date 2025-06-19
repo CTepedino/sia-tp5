@@ -1,5 +1,5 @@
 import numpy as np
-from MultiLayerPerceptron import MultiLayerPerceptron
+from multilayer_perceptron_denoising import MultiLayerPerceptron
 import matplotlib.pyplot as plt
 from activatorFunctions import non_linear_functions
 import os
@@ -72,7 +72,7 @@ def log_and_print(msg, file):
     print(msg)
     file.write(str(msg) + '\n')
 
-def plot_all_letters(data, results_directory):
+def plot_all_letters(data, results_directory, filename=None, titulo=None):
     n_letters = len(data)
     n_cols = 8
     n_rows = (n_letters + n_cols - 1) // n_cols
@@ -86,11 +86,27 @@ def plot_all_letters(data, results_directory):
         axs[i].axis("off")
 
     fig.tight_layout()
-    fig.savefig(os.path.join(results_directory, "letter_map.png"))
+    if titulo:
+        fig.suptitle(titulo, fontsize=16)
+        plt.subplots_adjust(top=0.88)
+    if filename:
+        fig.savefig(os.path.join(results_directory, filename))
+    else:
+        fig.savefig(os.path.join(results_directory, "letter_map.png"))
     plt.show()
 
-def entrenar_autoencoder(results_directory, epochs=5000):
+def agregar_ruido(letras, n_pixeles=3):
+    letras_ruidosas = []
+    for letra in letras:
+        letra_r = np.array(letra).copy()
+        indices = np.random.choice(len(letra_r), size=n_pixeles, replace=False)
+        letra_r[indices] = 1 - letra_r[indices]  # Flip bit
+        letras_ruidosas.append(letra_r)
+    return letras_ruidosas
+
+def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
     letras = font_to_binary_patterns()
+    letras_ruidosas = agregar_ruido(letras, n_pixeles=n_pixeles)
     # Elegir la función de activación por nombre
     activador, activador_deriv = non_linear_functions["sigmoid"]
 
@@ -107,7 +123,8 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         "function": "sigmoid",
         "optimizer": "adam",
         "loss_function": "binary_crossentropy",
-        "epochs": epochs
+        "epochs": epochs,
+        "n_pixeles_ruido": n_pixeles
     }
 
     capa_latente = len(params["layers"]) // 2
@@ -122,7 +139,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     weights_dir = 'weights'
     os.makedirs(weights_dir, exist_ok=True)
     arch_str = '-'.join(str(x) for x in params["layers"])
-    weights_path = os.path.join(weights_dir, f"MLP_{arch_str}.npy")
+    weights_path = os.path.join(weights_dir, f"MLP_{arch_str}_denoising.npy")
 
     # Crear el modelo
     ae = MultiLayerPerceptron(
@@ -143,14 +160,14 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         print("No se encontraron pesos previos. Se entrenará desde cero.")
 
     # Siempre entrenar (continuar o desde cero)
-    ae.train(letras, letras, epochs=epochs)
+    ae.train(letras_ruidosas, letras, epochs=epochs)
     np.save(weights_path, np.array(ae.weights, dtype=object))
     print(f"Pesos guardados en: {weights_path}")
 
     with open(os.path.join(results_directory, "result.txt"), "w") as f:
         errores_por_letra = []
         for idx, letra in enumerate(letras):
-            reconstruida = ae.test(letra)
+            reconstruida = ae.test(letras_ruidosas[idx])
             error_letra = sum(abs(np.array(letra) - (np.array(reconstruida) > 0.5).astype(int)))
             errores_por_letra.append(error_letra)
             log_and_print(f"Letra {font3_chars[idx]}: Error: {error_letra}", f)
@@ -182,20 +199,16 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 
         # Visualizamos espacio latente
         z_list = []
-        for letra in letras:
-            _, activaciones = ae.forward_propagation(letra)
+        for letra_r in letras_ruidosas:
+            _, activaciones = ae.forward_propagation(letra_r)
             z_list.append(activaciones[capa_latente])
 
         z = np.array(z_list)
-        # z_min = z.min(axis=0)
-        # z_max = z.max(axis=0)
-        # z_norm = (z - z_min) / (z_max - z_min)
         plt.scatter(z[:, 0], z[:, 1])
         for i in range(len(z)):
             plt.annotate(font3_chars[i], (z[i, 0], z[i, 1]))
         plt.title("Representación en el espacio latente (2D)")
         plt.grid(True)
-        # Guardar el gráfico
         plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
         plt.show()
 
@@ -204,18 +217,25 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     with open(os.path.join(results_directory, "resultado_letras.csv"), "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Letra", "Bits reconstruidos"])
-        for idx, letra in enumerate(letras):
-            reconstruida = ae.test(letra)
+        for idx, letra_r in enumerate(letras_ruidosas):
+            reconstruida = ae.test(letra_r)
             reconstruida_bin = (np.array(reconstruida) > 0.5).astype(int)
             letras_reconstruidas.append(reconstruida_bin)
-            # Como string de 0s y 1s
             bits_str = ''.join(str(bit) for bit in reconstruida_bin)
             writer.writerow([font3_chars[idx], bits_str])
 
     # Graficar todas las letras reconstruidas
-    plot_all_letters(np.array(letras_reconstruidas), results_directory)
+    plot_all_letters(np.array(letras_reconstruidas), results_directory, titulo="Resultado final")
+
+    # Graficar todas las letras de entrada (con ruido)
+    plot_all_letters(
+        np.array(letras_ruidosas),
+        results_directory,
+        filename="letter_map_ruido.png",
+        titulo=f"Entrada ruidosa con {n_pixeles} píxeles modificados"
+    )
 
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=5000)  # Reducimos el número de épocas
+    entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3)  # Denoising autoencoder con 3 píxeles modificados por defecto
