@@ -5,14 +5,28 @@ from datetime import datetime
 
 class MultiLayerPerceptron:
     def __init__(self, layers, learning_rate, activator_function, activator_derivative=lambda x: 1,
-                 optimizer="gradient"):
+                 optimizer="gradient", adaptive_lr=True, loss_function="mse"):
         self.layers = layers
         self.learning_rate = learning_rate
+        self.initial_learning_rate = learning_rate  # Guardar el learning rate inicial
         self.optimizer = optimizer
+        self.loss_function = loss_function
 
         
         self.activator_function = activator_function
         self.activator_derivative = activator_derivative
+
+        # Parámetros para learning rate adaptativo
+        self.adaptive_lr = adaptive_lr
+        self.lr_patience = 500  # Épocas sin mejora antes de reducir LR
+        self.lr_factor = 0.5  # Factor por el cual reducir el LR
+        self.lr_min = 1e-6  # Learning rate mínimo
+        self.lr_max = learning_rate * 10  # Learning rate máximo
+        self.lr_improvement_threshold = 1e-6  # Umbral para considerar mejora
+        self.lr_boost_factor = 1.1  # Factor para aumentar LR cuando hay mejoras
+        self.lr_boost_patience = 400  # Épocas con mejora antes de aumentar LR
+        self.lr_boost_counter = 0
+        self.lr_reduce_counter = 0
 
         # Inicialización de Xavier/Glorot para los pesos
         self.weights = []
@@ -75,13 +89,54 @@ class MultiLayerPerceptron:
         v_hat = self.v[l] / (1 - self.beta2 ** self.t)
 
         # Actualizar pesos con learning rate adaptativo
-        update = self.alpha * m_hat / (np.sqrt(v_hat) + self.epsilon)
+        current_lr = self.learning_rate if self.optimizer != "adam" else self.alpha
+        update = current_lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
         # Limitar el tamaño de la actualización para problemas simples
         if len(self.layers) <= 3 and max(self.layers) <= 10:
             update = np.clip(update, -0.1, 0.1)  # Limitar actualizaciones grandes
 
         self.weights[l] = np.array(self.weights[l]) - update
+
+    def adjust_learning_rate(self, current_error, best_error):
+        """Ajusta el learning rate basándose en el progreso del entrenamiento"""
+        if not self.adaptive_lr:
+            return
+
+        improvement = best_error - current_error
+        
+        if improvement > self.lr_improvement_threshold:
+            # Hay mejora, resetear contadores y posiblemente aumentar LR
+            self.lr_reduce_counter = 0
+            self.lr_boost_counter += 1
+            
+            if self.lr_boost_counter >= self.lr_boost_patience:
+                # Aumentar learning rate
+                old_lr = self.learning_rate
+                self.learning_rate = min(self.learning_rate * self.lr_boost_factor, self.lr_max)
+                if self.optimizer == "adam":
+                    self.alpha = min(self.alpha * self.lr_boost_factor, self.lr_max)
+                
+                if self.learning_rate != old_lr:
+                    print(f"  ↑ Learning rate aumentado a: {self.learning_rate}")
+                
+                self.lr_boost_counter = 0
+        else:
+            # No hay mejora significativa
+            self.lr_boost_counter = 0
+            self.lr_reduce_counter += 1
+            
+            if self.lr_reduce_counter >= self.lr_patience:
+                # Reducir learning rate
+                old_lr = self.learning_rate
+                self.learning_rate = max(self.learning_rate * self.lr_factor, self.lr_min)
+                if self.optimizer == "adam":
+                    self.alpha = max(self.alpha * self.lr_factor, self.lr_min)
+                
+                if self.learning_rate != old_lr:
+                    print(f"  ↓ Learning rate reducido a: {self.learning_rate}")
+                
+                self.lr_reduce_counter = 0
 
     def forward_propagation(self, input_data):
         activations = [np.array(input_data)]
@@ -105,10 +160,10 @@ class MultiLayerPerceptron:
         deltas = [None] * len(self.weights)
         expected_output = np.array(expected_output)
 
-        # Delta de la última capa
+        # Delta de la última capa usando la función de pérdida seleccionada
         last_layer = len(self.weights) - 1
-        output_error = activations[-1] - expected_output
-        deltas[last_layer] = output_error * np.array([self.activator_derivative(z) for z in hidden_states[-1]])
+        loss_derivative = self.compute_loss_derivative(activations[-1], expected_output)
+        deltas[last_layer] = loss_derivative * np.array([self.activator_derivative(z) for z in hidden_states[-1]])
 
         # Backpropagation
         for l in range(len(self.weights) - 2, -1, -1):
@@ -147,6 +202,14 @@ class MultiLayerPerceptron:
             self.m = [np.zeros_like(np.array(w)) for w in self.weights]
             self.v = [np.zeros_like(np.array(w)) for w in self.weights]
 
+        print(f"Iniciando entrenamiento con {epochs} épocas...")
+        print(f"Optimizador: {self.optimizer}")
+        print(f"Learning rate inicial: {self.initial_learning_rate}")
+        print(f"Learning rate adaptativo: {'Sí' if self.adaptive_lr else 'No'}")
+        print(f"Función de pérdida: {self.loss_function}")
+        print(f"Arquitectura: {self.layers}")
+        print("-" * 50)
+
         for epoch in range(epochs):
             error = 0
             np.random.seed(epoch)
@@ -160,33 +223,73 @@ class MultiLayerPerceptron:
                 output = activations[-1]
                 self.back_propagation(y, hidden_states, activations)
 
-                #error += 0.5 * np.sum((np.array(y) - output) ** 2)
-                error += np.mean((np.array(y) - output) ** 2)
+                # Usar la función de pérdida seleccionada
+                error += self.compute_loss(output, y)
 
             average_error = error / len(training_set)
             error_history.append(average_error)
+
+            # Imprimir estado cada 1000 épocas o en épocas especiales
+            if epoch % 1000 == 0 or epoch < 10 or epoch == epochs - 1:
+                current_lr = self.learning_rate if self.optimizer != "adam" else self.alpha
+                print(f"Época {epoch + 1:5d}/{epochs} | Error: {average_error:.6f} | Mejor: {best_error:.6f} | LR: {current_lr:.6f}")
 
             if average_error < (best_error - min_delta):
                 best_error = average_error
                 self.best_weights = copy.deepcopy(self.weights)
                 self.patience_counter = 0
+                if epoch % 1000 != 0:  # Evitar duplicar mensaje si ya se imprimió arriba
+                    current_lr = self.learning_rate if self.optimizer != "adam" else self.alpha
+                    print(f"Época {epoch + 1:5d}/{epochs} | Error: {average_error:.6f} | Mejor: {best_error:.6f} | LR: {current_lr:.6f} | ¡NUEVO MEJOR!")
             else:
                 self.patience_counter += 1
 
                 if len(error_history) >= window_size:
                     recent_errors = error_history[-window_size:]
                     if all(recent_errors[i] > recent_errors[i - 1] * 1.01 for i in range(1, len(recent_errors))):
-                        print(
-                            f"Early stopping en época {epoch + 1} - Error aumenta consistentemente en {window_size} épocas")
+                        print(f"Early stopping en época {epoch + 1} - Error aumenta consistentemente en {window_size} épocas")
                         break
 
                 if self.patience_counter >= self.patience:
-                    print(
-                        f"Early stopping en época {epoch + 1} - Paciencia agotada después de {self.patience} épocas sin mejora")
+                    print(f"Early stopping en época {epoch + 1} - Paciencia agotada después de {self.patience} épocas sin mejora")
                     break
 
+            self.adjust_learning_rate(average_error, best_error)
+
+        print("-" * 50)
+        print(f"Entrenamiento completado. Mejor error alcanzado: {best_error:.6f}")
         self.weights = copy.deepcopy(self.best_weights)
 
     def test(self, input_data):
         hidden_states, activations = self.forward_propagation(input_data)
         return activations[-1].tolist()
+
+    def compute_loss(self, predicted, target):
+        """Calcula la función de pérdida según la función seleccionada"""
+        predicted = np.array(predicted)
+        target = np.array(target)
+        
+        if self.loss_function == "mse":
+            return np.mean((target - predicted) ** 2)
+        elif self.loss_function == "binary_crossentropy":
+            # Evitar log(0) y log(1) con epsilon
+            epsilon = 1e-15
+            predicted = np.clip(predicted, epsilon, 1 - epsilon)
+            return -np.mean(target * np.log(predicted) + (1 - target) * np.log(1 - predicted))
+        else:
+            raise ValueError(f"Función de pérdida '{self.loss_function}' no soportada")
+
+    def compute_loss_derivative(self, predicted, target):
+        """Calcula la derivada de la función de pérdida"""
+        predicted = np.array(predicted)
+        target = np.array(target)
+        
+        if self.loss_function == "mse":
+            return predicted - target
+        elif self.loss_function == "binary_crossentropy":
+            # Evitar división por cero
+            epsilon = 1e-15
+            predicted = np.clip(predicted, epsilon, 1 - epsilon)
+            return (predicted - target) / (predicted * (1 - predicted))
+        else:
+            raise ValueError(f"Función de pérdida '{self.loss_function}' no soportada")

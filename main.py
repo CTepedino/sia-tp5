@@ -81,16 +81,15 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     params = {
         "layers": [
         35,
-        18,
-        6,
+        16,
         2,
-        6,
-        18,
+        16,
         35
         ],
-        "learning_rate": 0.0038,
+        "learning_rate": 0.0076,
         "function": "sigmoid",
         "optimizer": "adam",
+        "loss_function": "binary_crossentropy",
         "epochs": epochs
     }
 
@@ -102,15 +101,34 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
 
+    # Guardar/cargar los pesos en la carpeta 'weights/'
+    weights_dir = 'weights'
+    os.makedirs(weights_dir, exist_ok=True)
+    arch_str = '-'.join(str(x) for x in params["layers"])
+    weights_path = os.path.join(weights_dir, f"MLP_{arch_str}.npy")
+
+    # Crear el modelo
     ae = MultiLayerPerceptron(
         layers=params["layers"],
         learning_rate=params["learning_rate"],
         activator_function=activador,
         activator_derivative=activador_deriv,
-        optimizer=params["optimizer"]
+        optimizer=params["optimizer"],
+        loss_function="binary_crossentropy"
     )
 
+    # Intentar cargar pesos
+    if os.path.exists(weights_path):
+        print(f"Cargando pesos desde: {weights_path}")
+        ae.weights = list(np.load(weights_path, allow_pickle=True))
+        print("Pesos cargados correctamente. Se continuará el entrenamiento.")
+    else:
+        print("No se encontraron pesos previos. Se entrenará desde cero.")
+
+    # Siempre entrenar (continuar o desde cero)
     ae.train(letras, letras, epochs=epochs)
+    np.save(weights_path, np.array(ae.weights, dtype=object))
+    print(f"Pesos guardados en: {weights_path}")
 
     with open(os.path.join(results_directory, "result.txt"), "w") as f:
         errores_por_letra = []
@@ -178,4 +196,4 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=50000)  # Reducimos el número de épocas
+    entrenar_autoencoder(results_directory, epochs=5000)  # Reducimos el número de épocas
