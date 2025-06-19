@@ -78,11 +78,12 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 
     # Guardar parámetros en JSON
     params = {
-        "layers": [35, 11, 2, 11, 35],
-        "learning_rate": 0.0037,
+        "layers": [35, 10, 2, 10, 35],
+        "learning_rate": 0.002,
         "function": "sigmoid",
         "optimizer": "adam",
-        "epochs": epochs
+        "epochs": epochs,
+        "batch_size": 4
     }
 
     capa_latente = len(params["layers"]) // 2
@@ -96,7 +97,8 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         learning_rate=params["learning_rate"],
         activator_function=activador,
         activator_derivative=activador_deriv,
-        optimizer=params["optimizer"]
+        optimizer=params["optimizer"],
+        batch_size=params["batch_size"]
     )
 
     ae.train(letras, letras, epochs=epochs)
