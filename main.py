@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import json
 from collections import Counter
+import csv
 
 
 # El Font3 original en decimal (cada número representa una fila de 5 bits)
@@ -78,8 +79,16 @@ def entrenar_autoencoder(results_directory, epochs=5000):
 
     # Guardar parámetros en JSON
     params = {
-        "layers": [35, 11, 2, 11, 35],
-        "learning_rate": 0.0037,
+        "layers": [
+        35,
+        18,
+        6,
+        2,
+        6,
+        18,
+        35
+        ],
+        "learning_rate": 0.0038,
         "function": "sigmoid",
         "optimizer": "adam",
         "epochs": epochs
@@ -154,6 +163,17 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         # Guardar el gráfico
         plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
         plt.show()
+
+    # Guardar resultados de letras predichas
+    with open(os.path.join(results_directory, "resultado_letras.csv"), "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Letra", "Bits reconstruidos"])
+        for idx, letra in enumerate(letras):
+            reconstruida = ae.test(letra)
+            reconstruida_bin = (np.array(reconstruida) > 0.5).astype(int)
+            # Como string de 0s y 1s
+            bits_str = ''.join(str(bit) for bit in reconstruida_bin)
+            writer.writerow([font3_chars[idx], bits_str])
 
 if __name__ == "__main__":
     results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
