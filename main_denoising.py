@@ -7,6 +7,8 @@ from datetime import datetime
 import json
 from collections import Counter
 import csv
+import sys
+import argparse
 
 
 # El Font3 original en decimal (cada número representa una fila de 5 bits)
@@ -50,6 +52,30 @@ font3_chars = [
     "p", "q", "r", "s", "t", "u", "v", "w",
     "x", "y", "z", "{", "|", "}", "~", "DEL"
 ]
+
+def load_config(config_path):
+    """Carga la configuración desde un archivo JSON"""
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        # Validar configuración
+        required_keys = ['layers', 'learning_rate', 'function', 'optimizer', 'loss_function', 'epochs', 'n_pixeles_ruido']
+        for key in required_keys:
+            if key not in config:
+                raise ValueError(f"Falta el parámetro '{key}' en la configuración")
+        
+        return config
+    except FileNotFoundError:
+        print(f"Error: No se encontró el archivo de configuración '{config_path}'")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: El archivo de configuración no es un JSON válido: {e}")
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error en la configuración: {e}")
+        sys.exit(1)
+
 # Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
@@ -104,33 +130,25 @@ def agregar_ruido(letras, n_pixeles=3):
         letras_ruidosas.append(letra_r)
     return letras_ruidosas
 
-def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
+def entrenar_autoencoder(results_directory, config):
     letras = font_to_binary_patterns()
-    letras_ruidosas = agregar_ruido(letras, n_pixeles=n_pixeles)
+    letras_ruidosas = agregar_ruido(letras, n_pixeles=config["n_pixeles_ruido"])
     # Elegir la función de activación por nombre
-    activador, activador_deriv = non_linear_functions["sigmoid"]
+    activador, activador_deriv = non_linear_functions[config["function"]]
 
     # Guardar parámetros en JSON
     params = {
-        "layers": [
-        35,
-        17,
-        2,
-        17,
-        35
-        ],
-        "learning_rate": 0.007,
-        "function": "sigmoid",
-        "optimizer": "adam",
-        "loss_function": "binary_crossentropy",
-        "epochs": epochs,
-        "n_pixeles_ruido": n_pixeles
+        "layers": config["layers"],
+        "learning_rate": config["learning_rate"],
+        "function": config["function"],
+        "optimizer": config["optimizer"],
+        "loss_function": config["loss_function"],
+        "epochs": config["epochs"],
+        "n_pixeles_ruido": config["n_pixeles_ruido"]
     }
 
     capa_latente = len(params["layers"]) // 2
     print(f"Capa latente: {capa_latente}")
-    
-    capa_latente = len(params["layers"]) // 2
     
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
@@ -148,7 +166,7 @@ def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
         activator_function=activador,
         activator_derivative=activador_deriv,
         optimizer=params["optimizer"],
-        loss_function="binary_crossentropy"
+        loss_function=params["loss_function"]
     )
 
     # Intentar cargar pesos
@@ -160,7 +178,7 @@ def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
         print("No se encontraron pesos previos. Se entrenará desde cero.")
 
     # Siempre entrenar (continuar o desde cero)
-    ae.train(letras_ruidosas, letras, epochs=epochs)
+    ae.train(letras_ruidosas, letras, epochs=config["epochs"])
     np.save(weights_path, np.array(ae.weights, dtype=object))
     print(f"Pesos guardados en: {weights_path}")
 
@@ -232,10 +250,39 @@ def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
         np.array(letras_ruidosas),
         results_directory,
         filename="letter_map_ruido.png",
-        titulo=f"Entrada ruidosa con {n_pixeles} píxeles modificados"
+        titulo=f"Entrada ruidosa con {config['n_pixeles_ruido']} píxeles modificados"
     )
 
 if __name__ == "__main__":
-    results_directory = "results/result_denoising_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    # Configurar argumentos de línea de comandos
+    parser = argparse.ArgumentParser(description='Entrenar autoencoder de denoising')
+    parser.add_argument('config', help='Ruta al archivo de configuración JSON')
+    parser.add_argument('--output-dir', '-o', help='Directorio de salida (opcional, por defecto se crea automáticamente)')
+    
+    args = parser.parse_args()
+    
+    # Cargar configuración
+    config = load_config(args.config)
+    
+    # Crear directorio de resultados
+    if args.output_dir:
+        results_directory = args.output_dir
+    else:
+        results_directory = "results/result_denoising_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=35)  # Denoising autoencoder con 3 píxeles modificados por defecto
+    
+    # Mostrar configuración cargada
+    print("Configuración cargada:")
+    print(f"- Arquitectura: {config['layers']}")
+    print(f"- Learning rate: {config['learning_rate']}")
+    print(f"- Función de activación: {config['function']}")
+    print(f"- Optimizador: {config['optimizer']}")
+    print(f"- Función de pérdida: {config['loss_function']}")
+    print(f"- Épocas: {config['epochs']}")
+    print(f"- Píxeles de ruido: {config['n_pixeles_ruido']}")
+    print(f"- Directorio de resultados: {results_directory}")
+    print("-" * 60)
+    
+    # Entrenar autoencoder
+    entrenar_autoencoder(results_directory, config)
