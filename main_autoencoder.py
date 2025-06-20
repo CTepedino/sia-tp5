@@ -7,6 +7,8 @@ from datetime import datetime
 import json
 from collections import Counter
 import csv
+import sys
+import argparse
 
 
 # El Font3 original en decimal (cada número representa una fila de 5 bits)
@@ -50,6 +52,36 @@ font3_chars = [
     "p", "q", "r", "s", "t", "u", "v", "w",
     "x", "y", "z", "{", "|", "}", "~", "DEL"
 ]
+
+def load_config(config_path):
+    """Carga la configuración desde un archivo JSON"""
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        # Validar configuración
+        required_keys = ['layers', 'learning_rate', 'function', 'optimizer', 'loss_function', 'epochs', 'interpolation']
+        for key in required_keys:
+            if key not in config:
+                raise ValueError(f"Falta el parámetro '{key}' en la configuración")
+        
+        # Validar parámetros de interpolación
+        interpolation_keys = ['letra1_idx', 'letra2_idx', 'n_interpolations']
+        for key in interpolation_keys:
+            if key not in config['interpolation']:
+                raise ValueError(f"Falta el parámetro '{key}' en la sección 'interpolation'")
+        
+        return config
+    except FileNotFoundError:
+        print(f"Error: No se encontró el archivo de configuración '{config_path}'")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: El archivo de configuración no es un JSON válido: {e}")
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error en la configuración: {e}")
+        sys.exit(1)
+
 # Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
@@ -89,31 +121,120 @@ def plot_all_letters(data, results_directory):
     fig.savefig(os.path.join(results_directory, "letter_map.png"))
     plt.show()
 
-def entrenar_autoencoder(results_directory, epochs=5000):
+def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_latente, config):
+    """
+    Genera nuevas letras interpolando en el espacio latente entre letras existentes
+    """
+    print("\n" + "="*60)
+    print("GENERANDO NUEVAS LETRAS DESDE EL ESPACIO LATENTE")
+    print("="*60)
+    
+    # Obtener parámetros de interpolación del config
+    letra1_idx = config['interpolation']['letra1_idx']
+    letra2_idx = config['interpolation']['letra2_idx']
+    n_interpolations = config['interpolation']['n_interpolations']
+    
+    # Validar índices de letras
+    if letra1_idx < 0 or letra1_idx >= len(letras) or letra2_idx < 0 or letra2_idx >= len(letras):
+        print(f"Error: Los índices de letras deben estar entre 0 y {len(letras)-1}")
+        return
+    
+    # Obtener representaciones latentes de todas las letras
+    z_list = []
+    for letra in letras:
+        _, activaciones = ae.forward_propagation(letra)
+        z_list.append(activaciones[capa_latente])
+    
+    z = np.array(z_list)
+    
+    # Función para generar una letra desde un punto en el espacio latente
+    def generate_from_latent_point(latent_point):
+        """Genera una letra desde un punto en el espacio latente usando solo el decoder"""
+        # Simular la propagación hacia adelante desde el espacio latente
+        current_activation = np.array(latent_point)
+        
+        # Comenzar desde la capa latente (índice 2 en la arquitectura [35, 17, 2, 17, 35])
+        decoder_start = capa_latente
+        
+        for layer_idx in range(decoder_start, len(ae.weights)):
+            # Agregar bias
+            current_activation_with_bias = np.append(current_activation, 1.0)
+            layer_weights = np.array(ae.weights[layer_idx])
+            
+            # Calcular salida de la capa
+            h = np.dot(layer_weights, current_activation_with_bias)
+            current_activation = np.array([ae.activator_function(x) for x in h])
+        
+        return current_activation.tolist()
+    
+    # Interpolación lineal entre dos letras
+    print(f"\nInterpolación lineal entre letras '{font3_chars[letra1_idx]}' y '{font3_chars[letra2_idx]}':")
+    
+    z1, z2 = z[letra1_idx], z[letra2_idx]
+    
+    # Generar interpolaciones
+    interpolated_letters = []
+    
+    fig, axs = plt.subplots(1, n_interpolations + 2, figsize=(15, 3))
+    
+    # Mostrar letra original 1
+    letra1_bin = (np.array(letras[letra1_idx]) > 0.5).astype(int)
+    axs[0].imshow(letra1_bin.reshape(7, 5), cmap="binary")
+    axs[0].set_title(f"'{font3_chars[letra1_idx]}' original")
+    axs[0].axis("off")
+    
+    # Generar interpolaciones
+    for i in range(n_interpolations):
+        alpha = (i + 1) / (n_interpolations + 1)
+        interpolated_z = z1 * (1 - alpha) + z2 * alpha
+        
+        # Generar letra desde el punto interpolado
+        generated_letter = generate_from_latent_point(interpolated_z)
+        generated_bin = (np.array(generated_letter) > 0.5).astype(int)
+        interpolated_letters.append(generated_bin)
+        
+        axs[i + 1].imshow(generated_bin.reshape(7, 5), cmap="binary")
+        axs[i + 1].set_title(f"α={alpha:.2f}")
+        axs[i + 1].axis("off")
+    
+    # Mostrar letra original 2
+    letra2_bin = (np.array(letras[letra2_idx]) > 0.5).astype(int)
+    axs[-1].imshow(letra2_bin.reshape(7, 5), cmap="binary")
+    axs[-1].set_title(f"'{font3_chars[letra2_idx]}' original")
+    axs[-1].axis("off")
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_directory, "interpolacion_lineal.png"))
+    plt.show()
+    
+    # Guardar las letras interpoladas en un archivo CSV
+    with open(os.path.join(results_directory, "letras_interpoladas.csv"), "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Interpolación", "Alpha", "Bits generados"])
+        
+        for i, letra in enumerate(interpolated_letters):
+            alpha = (i + 1) / (n_interpolations + 1)
+            bits_str = ''.join(str(bit) for bit in letra)
+            writer.writerow([i+1, f"{alpha:.2f}", bits_str])
+
+
+def entrenar_autoencoder(results_directory, config):
     letras = font_to_binary_patterns()
     # Elegir la función de activación por nombre
-    activador, activador_deriv = non_linear_functions["sigmoid"]
+    activador, activador_deriv = non_linear_functions[config["function"]]
 
     # Guardar parámetros en JSON
     params = {
-        "layers": [
-        35,
-        14,
-        2,
-        14,
-        35
-        ],
-        "learning_rate": 0.0076,
-        "function": "sigmoid",
-        "optimizer": "adam",
-        "loss_function": "binary_crossentropy",
-        "epochs": epochs
+        "layers": config["layers"],
+        "learning_rate": config["learning_rate"],
+        "function": config["function"],
+        "optimizer": config["optimizer"],
+        "loss_function": config["loss_function"],
+        "epochs": config["epochs"]
     }
 
     capa_latente = len(params["layers"]) // 2
     print(f"Capa latente: {capa_latente}")
-    
-    capa_latente = len(params["layers"]) // 2
     
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
@@ -131,7 +252,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         activator_function=activador,
         activator_derivative=activador_deriv,
         optimizer=params["optimizer"],
-        loss_function="binary_crossentropy"
+        loss_function=params["loss_function"]
     )
 
     # Intentar cargar pesos
@@ -143,7 +264,7 @@ def entrenar_autoencoder(results_directory, epochs=5000):
         print("No se encontraron pesos previos. Se entrenará desde cero.")
 
     # Siempre entrenar (continuar o desde cero)
-    ae.train(letras, letras, epochs=epochs)
+    ae.train(letras, letras, epochs=config["epochs"])
     np.save(weights_path, np.array(ae.weights, dtype=object))
     print(f"Pesos guardados en: {weights_path}")
 
@@ -215,7 +336,39 @@ def entrenar_autoencoder(results_directory, epochs=5000):
     # Graficar todas las letras reconstruidas
     plot_all_letters(np.array(letras_reconstruidas), results_directory)
 
+    generate_new_letters_from_latent_space(ae, letras, results_directory, capa_latente, config)
+
 if __name__ == "__main__":
-    results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    # Configurar argumentos de línea de comandos
+    parser = argparse.ArgumentParser(description='Entrenar autoencoder y generar nuevas letras')
+    parser.add_argument('config', help='Ruta al archivo de configuración JSON')
+    parser.add_argument('--output-dir', '-o', help='Directorio de salida (opcional, por defecto se crea automáticamente)')
+    
+    args = parser.parse_args()
+    
+    # Cargar configuración
+    config = load_config(args.config)
+    
+    # Crear directorio de resultados
+    if args.output_dir:
+        results_directory = args.output_dir
+    else:
+        results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=5000)  # Reducimos el número de épocas
+    
+    # Mostrar configuración cargada
+    print("Configuración cargada:")
+    print(f"- Arquitectura: {config['layers']}")
+    print(f"- Learning rate: {config['learning_rate']}")
+    print(f"- Función de activación: {config['function']}")
+    print(f"- Optimizador: {config['optimizer']}")
+    print(f"- Función de pérdida: {config['loss_function']}")
+    print(f"- Épocas: {config['epochs']}")
+    print(f"- Interpolación: letra {config['interpolation']['letra1_idx']} ({font3_chars[config['interpolation']['letra1_idx']]}) a letra {config['interpolation']['letra2_idx']} ({font3_chars[config['interpolation']['letra2_idx']]})")
+    print(f"- Número de interpolaciones: {config['interpolation']['n_interpolations']}")
+    print(f"- Directorio de resultados: {results_directory}")
+    print("-" * 60)
+    
+    # Entrenar autoencoder
+    entrenar_autoencoder(results_directory, config)

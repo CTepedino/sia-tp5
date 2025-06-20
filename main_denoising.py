@@ -114,12 +114,12 @@ def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
     params = {
         "layers": [
         35,
-        14,
+        17,
         2,
-        14,
+        17,
         35
         ],
-        "learning_rate": 0.0076,
+        "learning_rate": 0.007,
         "function": "sigmoid",
         "optimizer": "adam",
         "loss_function": "binary_crossentropy",
@@ -236,6 +236,6 @@ def entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3):
     )
 
 if __name__ == "__main__":
-    results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    results_directory = "results/result_denoising_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(results_directory, exist_ok=True)
-    entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=3)  # Denoising autoencoder con 3 píxeles modificados por defecto
+    entrenar_autoencoder(results_directory, epochs=5000, n_pixeles=35)  # Denoising autoencoder con 3 píxeles modificados por defecto
