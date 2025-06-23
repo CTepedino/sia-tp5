@@ -4,7 +4,7 @@
   "latent_size": 20,
   "hidden_sizes": [300, 200, 100],
   "learning_rate": 0.0001,
-  "epochs": 1000,
+  "epochs": 1,
   "activator": "relu",
   "output_activator": "sigmoid",
 

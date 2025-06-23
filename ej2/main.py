@@ -73,6 +73,32 @@ def build_vae(INPUT_SIZE, hidden_sizes, main_activator, learning_rate, latent_si
     decoder = build_decoder(latent_size, hidden_sizes, main_activator, last_activator, learning_rate, INPUT_SIZE)
     return VariationalAutoencoder(encoder, latent, decoder)
 
+def save_emoji_grid(emojis, output_path, rows=None, cols=None):
+    total = len(emojis)
+    if rows is None and cols is None:
+        cols = int(np.ceil(np.sqrt(total)))
+        rows = int(np.ceil(total / cols))
+    elif rows is None:
+        rows = int(np.ceil(total / cols))
+    elif cols is None:
+        cols = int(np.ceil(total / rows))
+
+    grid = np.zeros((rows * INPUT_ROWS, cols * INPUT_COLS))
+
+    for idx, emoji in enumerate(emojis):
+        r = idx // cols
+        c = idx % cols
+        image = emoji.reshape((INPUT_ROWS, INPUT_COLS))
+        grid[r*INPUT_ROWS:(r+1)*INPUT_ROWS, c*INPUT_COLS:(c+1)*INPUT_COLS] = image
+
+    fig, ax = plt.subplots(figsize=(cols, rows))
+    ax.imshow(grid, cmap='gray')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+
 if __name__ == "__main__":
     with open(sys.argv[1], "r") as f:
         config = json.load(f)
@@ -96,6 +122,7 @@ if __name__ == "__main__":
 
     emoji_indexes = np.array(config.get("emoji_indexes", list(range(len(emoji_images)))))
 
+
     data = np.array(emoji_images)
     dataset_input = data[emoji_indexes]
     dataset_input_list = list(dataset_input)
@@ -103,6 +130,8 @@ if __name__ == "__main__":
     vae = build_vae(INPUT_SIZE, hidden_sizes, main_activator, learning_rate, latent_size, last_activator)
 
     vae.train(dataset_input=dataset_input_list, epochs=epochs)
+
+    save_emoji_grid(dataset_input_list, os.path.join(output_dir, "emoji_grid.png"))
 
     for i in range(len(dataset_input_list)):
         input_reshaped = np.reshape(dataset_input_list[i], (len(dataset_input_list[i]), 1))
