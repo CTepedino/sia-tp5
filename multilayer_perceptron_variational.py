@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 
+
 class MultiLayerPerceptron:
     def __init__(self, layers, learning_rate, activator_function, activator_derivative=lambda x: 1,
                  optimizer="gradient", split_output = None):
@@ -13,13 +14,10 @@ class MultiLayerPerceptron:
         self.activator_function = activator_function
         self.activator_derivative = activator_derivative
 
-        # Inicialización de Xavier/Glorot para los pesos
         self.weights = []
-
         for i in range(len(layers) - 1):
             neurons = layers[i + 1]
-            inputs = layers[i] + 1  # +1 por bias
-            # Xavier/Glorot initialization: scale = sqrt(2.0 / (fan_in + fan_out))
+            inputs = layers[i] + 1
             scale = np.sqrt(2.0 / (inputs + neurons))
             self.weights.append(np.random.normal(0, scale, (neurons, inputs)).tolist())
 
@@ -28,27 +26,24 @@ class MultiLayerPerceptron:
         self.patience = 50
         self.patience_counter = 0
 
-        # Parámetros para ADAM
         if self.optimizer == "adam":
             self.beta1 = 0.9
             self.beta2 = 0.999
             self.epsilon = 1e-8
-            self.alpha = learning_rate  # Tasa de aprendizaje base
-            self.m = [np.zeros_like(np.array(w)) for w in self.weights]  # Primer momento
-            self.v = [np.zeros_like(np.array(w)) for w in self.weights]  # Segundo momento
-            self.t = 0  # Paso de tiempo
+            self.alpha = learning_rate
+            self.m = [np.zeros_like(np.array(w)) for w in self.weights]
+            self.v = [np.zeros_like(np.array(w)) for w in self.weights]
+            self.t = 0
 
-            # Ajustar parámetros para problemas simples
-            if len(layers) <= 3 and max(layers) <= 10:  # Problemas simples como XOR o par/impar
-                self.beta1 = 0.8  # Menor momentum
-                self.beta2 = 0.9  # Menor adaptación
-                self.epsilon = 1e-6  # Mayor epsilon para evitar divisiones por cero
-                self.alpha = learning_rate * 0.1  # Learning rate más conservador
+            if len(layers) <= 3 and max(layers) <= 10:
+                self.beta1 = 0.8
+                self.beta2 = 0.9
+                self.epsilon = 1e-6
+                self.alpha = learning_rate * 0.1
 
-        # Parámetros para Momentum
         elif self.optimizer == "momentum":
-            self.momentum = 0.9  # Factor de momentum
-            self.velocity = [np.zeros_like(np.array(w)) for w in self.weights]  # Velocidad inicial
+            self.momentum = 0.9
+            self.velocity = [np.zeros_like(np.array(w)) for w in self.weights]
 
     def update_weights_gradient(self, l, delta, activation):
         weight_gradients = np.outer(delta, activation)
@@ -56,29 +51,20 @@ class MultiLayerPerceptron:
 
     def update_weights_momentum(self, l, delta, activation):
         weight_gradients = np.outer(delta, activation)
-        # Actualizar velocidad con momentum
         self.velocity[l] = self.momentum * self.velocity[l] - self.learning_rate * weight_gradients
-        # Actualizar pesos usando la velocidad
         self.weights[l] = np.array(self.weights[l]) + self.velocity[l]
 
     def update_weights_adam(self, l, delta, activation):
         self.t += 1
         weight_gradients = np.outer(delta, activation)
-
-        # Actualizar momentos
         self.m[l] = self.beta1 * self.m[l] + (1 - self.beta1) * weight_gradients
         self.v[l] = self.beta2 * self.v[l] + (1 - self.beta2) * np.square(weight_gradients)
-
-        # Corregir sesgo
         m_hat = self.m[l] / (1 - self.beta1 ** self.t)
         v_hat = self.v[l] / (1 - self.beta2 ** self.t)
-
-        # Actualizar pesos con learning rate adaptativo
         update = self.alpha * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
-        # Limitar el tamaño de la actualización para problemas simples
         if len(self.layers) <= 3 and max(self.layers) <= 10:
-            update = np.clip(update, -0.1, 0.1)  # Limitar actualizaciones grandes
+            update = np.clip(update, -0.1, 0.1)
 
         self.weights[l] = np.array(self.weights[l]) - update
 
@@ -87,11 +73,8 @@ class MultiLayerPerceptron:
         hidden_states = []
 
         for layer_index in range(len(self.weights)):
-            # Agregar bias como una columna
             prev_activation = np.append(activations[-1], 1.0)
             layer_weights = np.array(self.weights[layer_index])
-
-            # Calcular salida de la capa
             h = np.dot(layer_weights, prev_activation)
             a = np.array([self.activator_function(x) for x in h])
 
@@ -113,34 +96,27 @@ class MultiLayerPerceptron:
         deltas = [None] * len(self.weights)
         expected_output = np.array(expected_output)
 
-        # Delta de la última capa
         last_layer = len(self.weights) - 1
         output_error = activations[-1] - expected_output
         deltas[last_layer] = output_error * np.array([self.activator_derivative(z) for z in hidden_states[-1]])
 
-        # Backpropagation
         for l in range(len(self.weights) - 2, -1, -1):
             next_weights = np.array(self.weights[l + 1])
             next_delta = deltas[l + 1]
             current_h = hidden_states[l]
-
-            # Calcular delta sin considerar el bias
             delta = np.dot(next_weights[:, :-1].T, next_delta) * np.array(
                 [self.activator_derivative(z) for z in current_h])
             deltas[l] = delta
 
-        # Actualización de pesos
         for l in range(len(self.weights)):
             delta = deltas[l]
-            # Agregar bias como una columna
             activation = np.append(activations[l], 1.0)
 
-            # Actualizar pesos según el optimizador seleccionado
             if self.optimizer == "adam":
                 self.update_weights_adam(l, delta, activation)
             elif self.optimizer == "momentum":
                 self.update_weights_momentum(l, delta, activation)
-            else:  # gradient descent por defecto
+            else:
                 self.update_weights_gradient(l, delta, activation)
 
     def train(self, training_set, expected_outputs, epochs):
@@ -149,7 +125,6 @@ class MultiLayerPerceptron:
         min_delta = 1e-5
         window_size = 10
 
-        # Inicializar ADAM si es necesario
         if self.optimizer == "adam":
             self.t = 0
             self.m = [np.zeros_like(np.array(w)) for w in self.weights]
@@ -198,17 +173,20 @@ class MultiLayerPerceptron:
         hidden_states, activations = self.forward_propagation(input_data)
         return activations[-1].tolist()
 
+
 class VariationalAutoencoder:
     def __init__(self, input_dim, latent_dim, hidden_layers, learning_rate,
-                 activator_function, activator_derivative, optimizer="adam"):
+                 activator_function, activator_derivative, optimizer="adam", kl_weight=0.01):
         self.latent_dim = latent_dim
+        self.kl_weight = kl_weight
+
         self.encoder = MultiLayerPerceptron(
             layers=[input_dim] + hidden_layers + [2 * latent_dim],
             learning_rate=learning_rate,
             activator_function=activator_function,
             activator_derivative=activator_derivative,
             optimizer=optimizer,
-            split_output=2  # -> (mu, logvar)
+            split_output=2  # (mu, logvar)
         )
 
         self.decoder = MultiLayerPerceptron(
@@ -221,86 +199,80 @@ class VariationalAutoencoder:
 
     def reparameterize(self, mu, logvar):
         epsilon = np.random.normal(size=mu.shape)
-        z = mu + np.exp(0.5 * logvar) * epsilon
-        return z, epsilon
+        return mu + np.exp(0.5 * logvar) * epsilon, epsilon
 
     def loss(self, x_true, x_recon, mu, logvar):
         x_true = np.array(x_true)
         x_recon = np.array(x_recon)
 
-        # MSE reconstrucción por dimensión
         recon_loss = 0.5 * np.mean((x_true - x_recon) ** 2)
-
-        # KL Divergence promedio por dimensión
         kl_div = -0.5 * np.mean(1 + logvar - mu ** 2 - np.exp(logvar))
 
-        total = recon_loss + kl_div
-        return total, recon_loss, kl_div
+        return recon_loss, kl_div
 
     def forward(self, x):
         _, _, (mu, logvar) = self.encoder.forward_propagation(x)
         mu = np.array(mu)
-        logvar = np.clip(np.array(logvar), -10, 10)  # evita overflows numéricos
+        logvar = np.clip(np.array(logvar), -10, 10)
         z, epsilon = self.reparameterize(mu, logvar)
         _, activations = self.decoder.forward_propagation(z)
         x_recon = activations[-1]
         return x_recon, mu, logvar, z, epsilon
 
-    def train(self, dataset, epochs=100, verbose=True):
+    def train(self, dataset, epochs=100, verbose=True, max_kl_weight=0.001, warmup_epochs=30):
         self.loss_history = []
+        self.kl_history = []
+        self.recon_history = []
 
         for epoch in range(epochs):
+            kl_weight = min(max_kl_weight, epoch / warmup_epochs * max_kl_weight)
+
             total_loss = 0
             total_kl = 0
             total_recon = 0
 
             for x in dataset:
-                # === FORWARD ===
                 x_recon, mu, logvar, z, epsilon = self.forward(x)
-                loss, recon_loss, kl_div = self.loss(x, x_recon, mu, logvar)
+                recon_loss, kl_div = self.loss(x, x_recon, mu, logvar)
 
+                loss = recon_loss + kl_weight * kl_div
                 total_loss += loss
                 total_recon += recon_loss
                 total_kl += kl_div
 
-                # === BACKPROPAGATION DECODER ===
+                # === BACKPROP ===
                 self.decoder.back_propagation(x, *self.decoder.forward_propagation(z)[:2])
 
-                # === BACKPROPAGATION ENCODER ===
-                # Paso 1: forward decoder con z
                 hidden_states, activations = self.decoder.forward_propagation(z)
-                output = activations[-1]
-                error = output - np.array(x)
+                error = activations[-1] - np.array(x)
+                delta = error * np.array([self.decoder.activator_derivative(h) for h in hidden_states[-1]])
 
-                # Paso 2: delta capa de salida
-                delta_out = error * np.array([self.decoder.activator_derivative(h) for h in hidden_states[-1]])
+                for l in reversed(range(len(self.decoder.weights))):
+                    W = np.array(self.decoder.weights[l])[:, :-1]
+                    if l == 0:
+                        dz = W.T @ delta
+                        break
+                    h = hidden_states[l - 1]
+                    delta = W.T @ delta * np.array([self.decoder.activator_derivative(hh) for hh in h])
 
-                # Paso 3: propagar hacia capa anterior
-                W_out = np.array(self.decoder.weights[-1])[:, :-1]
-                delta_hidden = W_out.T @ delta_out
-
-                # Paso 4: propagar hasta z
-                W0 = np.array(self.decoder.weights[0])[:, :-1]
-                dz = W0.T @ delta_hidden
-
-                # === Gradientes KL ===
-                mu = np.array(mu)
-                logvar = np.clip(np.array(logvar), -10, 10)
-                dmu = dz + mu  # ∂L/∂mu
+                dmu = dz + mu
                 dlogvar = dz * epsilon * 0.5 * np.exp(0.5 * logvar) + 0.5 * (np.exp(logvar) - 1)
 
-                # === BACKPROP ENCODER ===
-                target = np.concatenate([mu - dmu, logvar - dlogvar])
+                target = np.concatenate([mu - kl_weight * dmu, logvar - kl_weight * dlogvar])
                 self.encoder.back_propagation(target, *self.encoder.forward_propagation(x)[:2])
 
             n = len(dataset)
             avg_loss = total_loss / n
             avg_recon = total_recon / n
             avg_kl = total_kl / n
+
             self.loss_history.append(avg_loss)
+            self.recon_history.append(avg_recon)
+            self.kl_history.append(avg_kl)
 
             if verbose:
-                print(f"[Epoch {epoch + 1:3}] Total: {avg_loss:.6f} | Recon: {avg_recon:.6f} | KL: {avg_kl:.6f}")
+                print(
+                    f"[Epoch {epoch + 1:3}] Total: {avg_loss:.6f} | Recon: {avg_recon:.6f} | KL: {avg_kl:.6f} | Weight: {kl_weight:.5f}")
 
     def encode(self, x):
         _, _, (mu, logvar) = self.encoder.forward_propagation(x)
