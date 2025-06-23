@@ -10,6 +10,8 @@ import csv
 import sys
 import argparse
 
+
+# El Font3 original en decimal (cada número representa una fila de 5 bits)
 Font3 = [
     [0x04, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00],
     [0x0e, 0x01, 0x0d, 0x13, 0x13, 0x0d, 0x00],
@@ -73,6 +75,7 @@ def load_config(config_path):
         print(f"Error en la configuración: {e}")
         sys.exit(1)
 
+# Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
     for symbol in Font3:
@@ -128,7 +131,11 @@ def agregar_ruido(letras, n_pixeles=3):
 
 def entrenar_autoencoder(results_directory, config):
     letras = font_to_binary_patterns()
+    # Para entrenamiento: usar datos sin ruido
+    letras_entrenamiento = letras
+    # Para testing: usar datos con ruido
     letras_ruidosas = agregar_ruido(letras, n_pixeles=config["n_pixeles_ruido"])
+    
     activador, activador_deriv = non_linear_functions[config["function"]]
 
     params = {
@@ -143,15 +150,19 @@ def entrenar_autoencoder(results_directory, config):
 
     capa_latente = len(params["layers"]) // 2
     print(f"Capa latente: {capa_latente}")
+    print(f"Entrenando con datos SIN ruido...")
+    print(f"Probando con datos CON {config['n_pixeles_ruido']} píxeles de ruido...")
     
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
 
+    # Guardar/cargar los pesos en la carpeta 'weights/'
     weights_dir = 'weights'
     os.makedirs(weights_dir, exist_ok=True)
     arch_str = '-'.join(str(x) for x in params["layers"])
     weights_path = os.path.join(weights_dir, f"MLP_{arch_str}_denoising.npy")
 
+    # Crear el modelo
     ae = MultiLayerPerceptron(
         layers=params["layers"],
         learning_rate=params["learning_rate"],
@@ -161,6 +172,7 @@ def entrenar_autoencoder(results_directory, config):
         loss_function=params["loss_function"]
     )
 
+    # Intentar cargar pesos
     if os.path.exists(weights_path):
         print(f"Cargando pesos desde: {weights_path}")
         ae.weights = list(np.load(weights_path, allow_pickle=True))
@@ -168,13 +180,15 @@ def entrenar_autoencoder(results_directory, config):
     else:
         print("No se encontraron pesos previos. Se entrenará desde cero.")
 
-    ae.train(letras_ruidosas, letras, epochs=config["epochs"])
+    # Entrenar con datos sin ruido
+    ae.train(letras_entrenamiento, letras, epochs=config["epochs"])
     np.save(weights_path, np.array(ae.weights, dtype=object))
     print(f"Pesos guardados en: {weights_path}")
 
     with open(os.path.join(results_directory, "result.txt"), "w") as f:
         errores_por_letra = []
         for idx, letra in enumerate(letras):
+            # Probar con datos ruidosos
             reconstruida = ae.test(letras_ruidosas[idx])
             error_letra = sum(abs(np.array(letra) - (np.array(reconstruida) > 0.5).astype(int)))
             errores_por_letra.append(error_letra)
@@ -183,6 +197,7 @@ def entrenar_autoencoder(results_directory, config):
         log_and_print(f"Error máximo por letra: {max(errores_por_letra)}", f)
         log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
 
+        # Gráfico de barras de distribución de errores
         error_counts = Counter(errores_por_letra)
         
         plt.figure(figsize=(10, 6))
@@ -192,10 +207,11 @@ def entrenar_autoencoder(results_directory, config):
         plt.bar(errors, counts)
         plt.xlabel('Error (píxeles)')
         plt.ylabel('Cantidad de letras')
-        plt.title('Distribución de errores por letra')
+        plt.title('Distribución de errores por letra (Test con ruido)')
         plt.xticks(errors)
         plt.grid(True, alpha=0.3)
         
+        # Agregar etiquetas de valor en las barras
         for i, (error, count) in enumerate(zip(errors, counts)):
             plt.text(error, count + 0.1, str(count), ha='center', va='bottom')
         
@@ -203,6 +219,7 @@ def entrenar_autoencoder(results_directory, config):
         plt.savefig(os.path.join(results_directory, "distribucion_errores.png"))
         plt.show()
 
+        # Visualizamos espacio latente con datos ruidosos
         z_list = []
         for letra_r in letras_ruidosas:
             _, activaciones = ae.forward_propagation(letra_r)
@@ -212,11 +229,12 @@ def entrenar_autoencoder(results_directory, config):
         plt.scatter(z[:, 0], z[:, 1])
         for i in range(len(z)):
             plt.annotate(font3_chars[i], (z[i, 0], z[i, 1]))
-        plt.title("Representación en el espacio latente (2D)")
+        plt.title("Representación en el espacio latente (2D) - Datos ruidosos")
         plt.grid(True)
         plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
         plt.show()
 
+    # Guardar resultados de letras predichas
     letras_reconstruidas = []
     with open(os.path.join(results_directory, "resultado_letras.csv"), "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -228,18 +246,28 @@ def entrenar_autoencoder(results_directory, config):
             bits_str = ''.join(str(bit) for bit in reconstruida_bin)
             writer.writerow([font3_chars[idx], bits_str])
 
-    plot_all_letters(np.array(letras_reconstruidas), results_directory, titulo="Resultado final")
+    # Graficar todas las letras reconstruidas
+    plot_all_letters(np.array(letras_reconstruidas), results_directory, titulo="Resultado final - Reconstrucción desde datos ruidosos")
 
+    # Graficar todas las letras de entrada (con ruido)
     plot_all_letters(
         np.array(letras_ruidosas),
         results_directory,
         filename="letter_map_ruido.png",
         titulo=f"Entrada ruidosa con {config['n_pixeles_ruido']} píxeles modificados"
     )
+    
+    # Agregar visualización de datos originales para comparación
+    plot_all_letters(
+        np.array(letras),
+        results_directory,
+        filename="letter_map_original.png",
+        titulo="Datos originales sin ruido"
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Entrenar autoencoder de denoising')
-    parser.add_argument('config', help='Ruta al archivo de configuración JSON')
+    parser.add_argument('--config', '-c', default='configs/config_denoising.json', help='Ruta al archivo de configuración JSON')
     parser.add_argument('--output-dir', '-o', help='Directorio de salida (opcional, por defecto se crea automáticamente)')
     
     args = parser.parse_args()

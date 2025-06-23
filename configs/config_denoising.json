@@ -1,9 +1,9 @@
 {
     "layers": [35, 17, 2, 17, 35],
-    "learning_rate": 0.007,
+    "learning_rate": 0.009,
     "function": "sigmoid",
     "optimizer": "adam",
     "loss_function": "binary_crossentropy",
     "epochs": 5000,
-    "n_pixeles_ruido": 3
+    "n_pixeles_ruido": 35
 } 
