@@ -47,7 +47,7 @@ El sistema utiliza un archivo JSON de configuración para todos los parámetros.
 
 ### Ejecución básica:
 ```bash
-python main_autoencoder.py config_autoencoder.json
+uv run ./main_autoencoder.py config_autoencoder.json
 ```
 
 ### Con directorio de salida personalizado:

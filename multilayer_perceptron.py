@@ -8,7 +8,7 @@ class MultiLayerPerceptron:
                  optimizer="gradient", adaptive_lr=True, loss_function="mse"):
         self.layers = layers
         self.learning_rate = learning_rate
-        self.initial_learning_rate = learning_rate  # Guardar el learning rate inicial
+        self.initial_learning_rate = learning_rate  
         self.optimizer = optimizer
         self.loss_function = loss_function
 
@@ -16,24 +16,22 @@ class MultiLayerPerceptron:
         self.activator_function = activator_function
         self.activator_derivative = activator_derivative
 
-        # Parámetros para learning rate adaptativo
         self.adaptive_lr = adaptive_lr
-        self.lr_patience = 500  # Épocas sin mejora antes de reducir LR
-        self.lr_factor = 0.5  # Factor por el cual reducir el LR
-        self.lr_min = 1e-6  # Learning rate mínimo
-        self.lr_max = learning_rate * 10  # Learning rate máximo
-        self.lr_improvement_threshold = 1e-6  # Umbral para considerar mejora
-        self.lr_boost_factor = 1.1  # Factor para aumentar LR cuando hay mejoras
-        self.lr_boost_patience = 400  # Épocas con mejora antes de aumentar LR
+        self.lr_patience = 500  
+        self.lr_factor = 0.5  
+        self.lr_min = 1e-6  
+        self.lr_max = learning_rate * 10  
+        self.lr_improvement_threshold = 1e-6  
+        self.lr_boost_factor = 1.1  
+        self.lr_boost_patience = 400  
         self.lr_boost_counter = 0
         self.lr_reduce_counter = 0
 
-        # Inicialización de Xavier/Glorot para los pesos
         self.weights = []
 
         for i in range(len(layers) - 1):
             neurons = layers[i + 1]
-            inputs = layers[i] + 1  # +1 por bias
+            inputs = layers[i] + 1 
             # Xavier/Glorot initialization: scale = sqrt(2.0 / (fan_in + fan_out))
             scale = np.sqrt(2.0 / (inputs + neurons))
             self.weights.append(np.random.normal(0, scale, (neurons, inputs)).tolist())
@@ -43,24 +41,21 @@ class MultiLayerPerceptron:
         self.patience = 8000
         self.patience_counter = 0
 
-        # Parámetros para ADAM
         if self.optimizer == "adam":
             self.beta1 = 0.9
             self.beta2 = 0.999
             self.epsilon = 1e-8
-            self.alpha = learning_rate  # Tasa de aprendizaje base
-            self.m = [np.zeros_like(np.array(w)) for w in self.weights]  # Primer momento
-            self.v = [np.zeros_like(np.array(w)) for w in self.weights]  # Segundo momento
-            self.t = 0  # Paso de tiempo
+            self.alpha = learning_rate  
+            self.m = [np.zeros_like(np.array(w)) for w in self.weights]  
+            self.v = [np.zeros_like(np.array(w)) for w in self.weights]  
+            self.t = 0  
 
-            # Ajustar parámetros para problemas simples
-            if len(layers) <= 3 and max(layers) <= 10:  # Problemas simples como XOR o par/impar
-                self.beta1 = 0.8  # Menor momentum
-                self.beta2 = 0.9  # Menor adaptación
-                self.epsilon = 1e-6  # Mayor epsilon para evitar divisiones por cero
-                self.alpha = learning_rate * 0.1  # Learning rate más conservador
+            if len(layers) <= 3 and max(layers) <= 10:  
+                self.beta1 = 0.8  
+                self.beta2 = 0.9  
+                self.epsilon = 1e-6  
+                self.alpha = learning_rate * 0.1  
 
-        # Parámetros para Momentum
         elif self.optimizer == "momentum":
             self.momentum = 0.9  # Factor de momentum
             self.velocity = [np.zeros_like(np.array(w)) for w in self.weights]  # Velocidad inicial
@@ -71,30 +66,25 @@ class MultiLayerPerceptron:
 
     def update_weights_momentum(self, l, delta, activation):
         weight_gradients = np.outer(delta, activation)
-        # Actualizar velocidad con momentum
         self.velocity[l] = self.momentum * self.velocity[l] - self.learning_rate * weight_gradients
-        # Actualizar pesos usando la velocidad
         self.weights[l] = np.array(self.weights[l]) + self.velocity[l]
 
     def update_weights_adam(self, l, delta, activation):
         self.t += 1
         weight_gradients = np.outer(delta, activation)
 
-        # Actualizar momentos
         self.m[l] = self.beta1 * self.m[l] + (1 - self.beta1) * weight_gradients
         self.v[l] = self.beta2 * self.v[l] + (1 - self.beta2) * np.square(weight_gradients)
 
-        # Corregir sesgo
         m_hat = self.m[l] / (1 - self.beta1 ** self.t)
         v_hat = self.v[l] / (1 - self.beta2 ** self.t)
 
-        # Actualizar pesos con learning rate adaptativo
         current_lr = self.learning_rate if self.optimizer != "adam" else self.alpha
         update = current_lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
         # Limitar el tamaño de la actualización para problemas simples
         if len(self.layers) <= 3 and max(self.layers) <= 10:
-            update = np.clip(update, -0.1, 0.1)  # Limitar actualizaciones grandes
+            update = np.clip(update, -0.1, 0.1)  
 
         self.weights[l] = np.array(self.weights[l]) - update
 
@@ -106,12 +96,10 @@ class MultiLayerPerceptron:
         improvement = best_error - current_error
         
         if improvement > self.lr_improvement_threshold:
-            # Hay mejora, resetear contadores y posiblemente aumentar LR
             self.lr_reduce_counter = 0
             self.lr_boost_counter += 1
             
             if self.lr_boost_counter >= self.lr_boost_patience:
-                # Aumentar learning rate
                 old_lr = self.learning_rate
                 self.learning_rate = min(self.learning_rate * self.lr_boost_factor, self.lr_max)
                 if self.optimizer == "adam":
@@ -122,12 +110,10 @@ class MultiLayerPerceptron:
                 
                 self.lr_boost_counter = 0
         else:
-            # No hay mejora significativa
             self.lr_boost_counter = 0
             self.lr_reduce_counter += 1
             
             if self.lr_reduce_counter >= self.lr_patience:
-                # Reducir learning rate
                 old_lr = self.learning_rate
                 self.learning_rate = max(self.learning_rate * self.lr_factor, self.lr_min)
                 if self.optimizer == "adam":
@@ -143,11 +129,9 @@ class MultiLayerPerceptron:
         hidden_states = []
 
         for layer_index in range(len(self.weights)):
-            # Agregar bias como una columna
             prev_activation = np.append(activations[-1], 1.0)
             layer_weights = np.array(self.weights[layer_index])
 
-            # Calcular salida de la capa
             h = np.dot(layer_weights, prev_activation)
             a = np.array([self.activator_function(x) for x in h])
 
@@ -160,7 +144,6 @@ class MultiLayerPerceptron:
         deltas = [None] * len(self.weights)
         expected_output = np.array(expected_output)
 
-        # Delta de la última capa usando la función de pérdida seleccionada
         last_layer = len(self.weights) - 1
         loss_derivative = self.compute_loss_derivative(activations[-1], expected_output)
         deltas[last_layer] = loss_derivative * np.array([self.activator_derivative(z) for z in hidden_states[-1]])
@@ -171,7 +154,6 @@ class MultiLayerPerceptron:
             next_delta = deltas[l + 1]
             current_h = hidden_states[l]
 
-            # Calcular delta sin considerar el bias
             delta = np.dot(next_weights[:, :-1].T, next_delta) * np.array(
                 [self.activator_derivative(z) for z in current_h])
             deltas[l] = delta
@@ -182,7 +164,6 @@ class MultiLayerPerceptron:
             # Agregar bias como una columna
             activation = np.append(activations[l], 1.0)
 
-            # Actualizar pesos según el optimizador seleccionado
             if self.optimizer == "adam":
                 self.update_weights_adam(l, delta, activation)
             elif self.optimizer == "momentum":
@@ -196,7 +177,6 @@ class MultiLayerPerceptron:
         min_delta = 1e-5
         window_size = 10
 
-        # Inicializar ADAM si es necesario
         if self.optimizer == "adam":
             self.t = 0
             self.m = [np.zeros_like(np.array(w)) for w in self.weights]
@@ -223,13 +203,11 @@ class MultiLayerPerceptron:
                 output = activations[-1]
                 self.back_propagation(y, hidden_states, activations)
 
-                # Usar la función de pérdida seleccionada
                 error += self.compute_loss(output, y)
 
             average_error = error / len(training_set)
             error_history.append(average_error)
 
-            # Imprimir estado cada 1000 épocas o en épocas especiales
             if epoch % 1000 == 0 or epoch < 10 or epoch == epochs - 1:
                 current_lr = self.learning_rate if self.optimizer != "adam" else self.alpha
                 print(f"Época {epoch + 1:5d}/{epochs} | Error: {average_error:.6f} | Mejor: {best_error:.6f} | LR: {current_lr:.6f}")
@@ -238,7 +216,7 @@ class MultiLayerPerceptron:
                 best_error = average_error
                 self.best_weights = copy.deepcopy(self.weights)
                 self.patience_counter = 0
-                if epoch % 1000 != 0:  # Evitar duplicar mensaje si ya se imprimió arriba
+                if epoch % 1000 != 0:
                     current_lr = self.learning_rate if self.optimizer != "adam" else self.alpha
                     print(f"Época {epoch + 1:5d}/{epochs} | Error: {average_error:.6f} | Mejor: {best_error:.6f} | LR: {current_lr:.6f} | ¡NUEVO MEJOR!")
             else:
@@ -272,7 +250,6 @@ class MultiLayerPerceptron:
         if self.loss_function == "mse":
             return np.mean((target - predicted) ** 2)
         elif self.loss_function == "binary_crossentropy":
-            # Evitar log(0) y log(1) con epsilon
             epsilon = 1e-15
             predicted = np.clip(predicted, epsilon, 1 - epsilon)
             return -np.mean(target * np.log(predicted) + (1 - target) * np.log(1 - predicted))
@@ -287,7 +264,6 @@ class MultiLayerPerceptron:
         if self.loss_function == "mse":
             return predicted - target
         elif self.loss_function == "binary_crossentropy":
-            # Evitar división por cero
             epsilon = 1e-15
             predicted = np.clip(predicted, epsilon, 1 - epsilon)
             return (predicted - target) / (predicted * (1 - predicted))

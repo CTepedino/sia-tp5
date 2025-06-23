@@ -1,5 +1,5 @@
 import numpy as np
-from multilayer_perceptron_denoising import MultiLayerPerceptron
+from multilayer_perceptron import MultiLayerPerceptron
 import matplotlib.pyplot as plt
 from activatorFunctions import non_linear_functions
 import os
@@ -10,8 +10,6 @@ import csv
 import sys
 import argparse
 
-
-# El Font3 original en decimal (cada número representa una fila de 5 bits)
 Font3 = [
     [0x04, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00],
     [0x0e, 0x01, 0x0d, 0x13, 0x13, 0x0d, 0x00],
@@ -59,7 +57,6 @@ def load_config(config_path):
         with open(config_path, 'r') as f:
             config = json.load(f)
         
-        # Validar configuración
         required_keys = ['layers', 'learning_rate', 'function', 'optimizer', 'loss_function', 'epochs', 'n_pixeles_ruido']
         for key in required_keys:
             if key not in config:
@@ -76,7 +73,6 @@ def load_config(config_path):
         print(f"Error en la configuración: {e}")
         sys.exit(1)
 
-# Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
     for symbol in Font3:
@@ -133,10 +129,8 @@ def agregar_ruido(letras, n_pixeles=3):
 def entrenar_autoencoder(results_directory, config):
     letras = font_to_binary_patterns()
     letras_ruidosas = agregar_ruido(letras, n_pixeles=config["n_pixeles_ruido"])
-    # Elegir la función de activación por nombre
     activador, activador_deriv = non_linear_functions[config["function"]]
 
-    # Guardar parámetros en JSON
     params = {
         "layers": config["layers"],
         "learning_rate": config["learning_rate"],
@@ -153,13 +147,11 @@ def entrenar_autoencoder(results_directory, config):
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
 
-    # Guardar/cargar los pesos en la carpeta 'weights/'
     weights_dir = 'weights'
     os.makedirs(weights_dir, exist_ok=True)
     arch_str = '-'.join(str(x) for x in params["layers"])
     weights_path = os.path.join(weights_dir, f"MLP_{arch_str}_denoising.npy")
 
-    # Crear el modelo
     ae = MultiLayerPerceptron(
         layers=params["layers"],
         learning_rate=params["learning_rate"],
@@ -169,7 +161,6 @@ def entrenar_autoencoder(results_directory, config):
         loss_function=params["loss_function"]
     )
 
-    # Intentar cargar pesos
     if os.path.exists(weights_path):
         print(f"Cargando pesos desde: {weights_path}")
         ae.weights = list(np.load(weights_path, allow_pickle=True))
@@ -177,7 +168,6 @@ def entrenar_autoencoder(results_directory, config):
     else:
         print("No se encontraron pesos previos. Se entrenará desde cero.")
 
-    # Siempre entrenar (continuar o desde cero)
     ae.train(letras_ruidosas, letras, epochs=config["epochs"])
     np.save(weights_path, np.array(ae.weights, dtype=object))
     print(f"Pesos guardados en: {weights_path}")
@@ -193,7 +183,6 @@ def entrenar_autoencoder(results_directory, config):
         log_and_print(f"Error máximo por letra: {max(errores_por_letra)}", f)
         log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
 
-        # Gráfico de barras de distribución de errores
         error_counts = Counter(errores_por_letra)
         
         plt.figure(figsize=(10, 6))
@@ -207,7 +196,6 @@ def entrenar_autoencoder(results_directory, config):
         plt.xticks(errors)
         plt.grid(True, alpha=0.3)
         
-        # Agregar etiquetas de valor en las barras
         for i, (error, count) in enumerate(zip(errors, counts)):
             plt.text(error, count + 0.1, str(count), ha='center', va='bottom')
         
@@ -215,7 +203,6 @@ def entrenar_autoencoder(results_directory, config):
         plt.savefig(os.path.join(results_directory, "distribucion_errores.png"))
         plt.show()
 
-        # Visualizamos espacio latente
         z_list = []
         for letra_r in letras_ruidosas:
             _, activaciones = ae.forward_propagation(letra_r)
@@ -230,7 +217,6 @@ def entrenar_autoencoder(results_directory, config):
         plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
         plt.show()
 
-    # Guardar resultados de letras predichas
     letras_reconstruidas = []
     with open(os.path.join(results_directory, "resultado_letras.csv"), "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -242,10 +228,8 @@ def entrenar_autoencoder(results_directory, config):
             bits_str = ''.join(str(bit) for bit in reconstruida_bin)
             writer.writerow([font3_chars[idx], bits_str])
 
-    # Graficar todas las letras reconstruidas
     plot_all_letters(np.array(letras_reconstruidas), results_directory, titulo="Resultado final")
 
-    # Graficar todas las letras de entrada (con ruido)
     plot_all_letters(
         np.array(letras_ruidosas),
         results_directory,
@@ -254,17 +238,14 @@ def entrenar_autoencoder(results_directory, config):
     )
 
 if __name__ == "__main__":
-    # Configurar argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Entrenar autoencoder de denoising')
     parser.add_argument('config', help='Ruta al archivo de configuración JSON')
     parser.add_argument('--output-dir', '-o', help='Directorio de salida (opcional, por defecto se crea automáticamente)')
     
     args = parser.parse_args()
     
-    # Cargar configuración
     config = load_config(args.config)
     
-    # Crear directorio de resultados
     if args.output_dir:
         results_directory = args.output_dir
     else:
@@ -272,7 +253,6 @@ if __name__ == "__main__":
     
     os.makedirs(results_directory, exist_ok=True)
     
-    # Mostrar configuración cargada
     print("Configuración cargada:")
     print(f"- Arquitectura: {config['layers']}")
     print(f"- Learning rate: {config['learning_rate']}")
@@ -284,5 +264,4 @@ if __name__ == "__main__":
     print(f"- Directorio de resultados: {results_directory}")
     print("-" * 60)
     
-    # Entrenar autoencoder
     entrenar_autoencoder(results_directory, config)
