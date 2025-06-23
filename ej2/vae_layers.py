@@ -79,19 +79,20 @@ class LatentLayer:
         )
 
     def feedforward(self, input):
-        self.latent_mean = self.mean.feedforward(input)
-        self.latent_log_var = self.log_var.feedforward(input)
+        self.mu = self.mean.feedforward(input)
+        self.logvar = self.log_var.feedforward(input)
         self.epsilon = np.random.standard_normal(size=(self.output_dim, input.shape[1]))
-        self.sample = self.latent_mean + np.exp(self.latent_log_var / 2.0) * self.epsilon
+        self.sample = self.mu + np.exp(self.logvar / 2.0) * self.epsilon
+
         return self.sample
 
     def backpropagate(self, last_gradient):
         normalizer = self.output_dim * last_gradient.shape[1]
 
-        grad_log_var_kl = (np.exp(self.latent_log_var) - 1) / (2 * normalizer)
-        grad_mean_kl = self.latent_mean / normalizer
+        grad_log_var_kl = (np.exp(self.logvar) - 1) / (2 * normalizer)
+        grad_mean_kl = self.mu / normalizer
 
-        grad_log_var_mse = 0.5 * last_gradient * self.epsilon * np.exp(self.latent_log_var / 2.0)
+        grad_log_var_mse = 0.5 * last_gradient * self.epsilon * np.exp(self.logvar / 2.0)
         grad_mean_mse = last_gradient
 
         grad_log_var_total = grad_log_var_kl + grad_log_var_mse

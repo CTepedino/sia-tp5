@@ -9,6 +9,9 @@ from ej2.emojis import emoji_images
 from vae_layers import Layer, LatentLayer
 from variational_autoencoder import MultiLayerPerceptron, VariationalAutoencoder
 
+import seaborn as sns
+
+
 import os
 from datetime import datetime
 import shutil
@@ -17,6 +20,9 @@ INPUT_ROWS = 20
 INPUT_COLS = 20
 INPUT_SIZE = INPUT_COLS * INPUT_ROWS
 # fijo, son los tamaños de los emojis
+
+def mse(y_true, y_pred):
+    return np.mean((y_true - y_pred) ** 2)
 
 def show_comparison(original, decoded, index, output_dir):
     fig, (ax1, ax2) = plt.subplots(1, 2)
@@ -139,6 +145,14 @@ if __name__ == "__main__":
 
         show_comparison(list(dataset_input)[i], output, i, output_dir)
 
+    reconstructions = []
+
+    for input_vec in dataset_input_list:
+        input_reshaped = input_vec.reshape((-1, 1))
+        output = vae.feedforward(input_reshaped)
+        reconstructions.append(output.flatten())
+
+    save_emoji_grid(reconstructions, os.path.join(output_dir, "vae_recon_grid.png"))
 
     for interpolation_idx in range(num_interpolations):
 
@@ -171,3 +185,44 @@ if __name__ == "__main__":
         fig.tight_layout()
         fig.savefig(os.path.join(output_dir, f"interpolation_{interpolation_idx}.png"))
         plt.close(fig)
+
+    if latent_size == 2:
+        # Obtener las coordenadas latentes mu para cada emoji
+        latent_coords = []
+        for emoji in dataset_input_list:
+            input_reshaped = np.reshape(emoji, (INPUT_SIZE, 1))
+            vae.feedforward(input_reshaped)
+            mu = vae.latent.mu
+            latent_coords.append(mu.flatten())
+
+        latent_coords = np.array(latent_coords)
+
+        # Gráfico del espacio latente
+        plt.figure(figsize=(6, 6))
+        sns.scatterplot(x=latent_coords[:, 0], y=latent_coords[:, 1], hue=emoji_indexes, palette='tab10', s=100)
+        plt.title("Espacio latente (2D) del VAE")
+        plt.xlabel("Dim 1")
+        plt.ylabel("Dim 2")
+        plt.legend(title="Emoji index", bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "latent_space.png"))
+        plt.close()
+
+    # Calcular MSE por emoji
+    mse_errors = []
+    for i, emoji in enumerate(dataset_input_list):
+        input_reshaped = np.reshape(emoji, (INPUT_SIZE, 1))
+        output = vae.feedforward(input_reshaped)
+        mse_errors.append( mse(emoji, output.flatten()))
+
+    avg_mse = np.mean(mse_errors)
+
+    plt.figure(figsize=(8, 5))
+    plt.hist(mse_errors, bins=15, color='skyblue', edgecolor='black')
+    plt.title("Distribución del error de reconstrucción (MSE)")
+    plt.xlabel("Error de reconstrucción (MSE)")
+    plt.ylabel("Cantidad de emojis")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "reconstruction_mse_histogram.png"))
+    plt.close()
