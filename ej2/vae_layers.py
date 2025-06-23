@@ -15,18 +15,21 @@ class Layer:
         self.bias = np.zeros(output_dim)
 
         # Adam parameters
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
+        self.epsilon = 1e-8
+
         self.m_w = np.zeros_like(self.weight)
         self.v_w = np.zeros_like(self.weight)
         self.m_b = np.zeros_like(self.bias)
         self.v_b = np.zeros_like(self.bias)
         self.t = 0
-        self.batch_size = 1
         self.learning_factor = self.learning_rate
 
 
     def feedforward(self, input):
         if input.ndim == 1:
-            input = np.squeeze(input).reshape((input.shape[0], self.batch_size))
+            input = input.reshape((input.shape[0], 1))
 
         self.input = input
         self.z = np.dot(self.weight, self.input) + np.tile(self.bias, (self.input.shape[1], 1)).T
@@ -43,26 +46,21 @@ class Layer:
 
         self.t += 1
 
-        self.m_w = 0.9 * self.m_w + 0.1 * grad_weight
-        self.v_w = 0.999 * self.v_w + 0.001 * (grad_weight ** 2)
-        m_hat_w = self.m_w / (1 - 0.9 ** self.t)
-        v_hat_w = self.v_w / (1 - 0.999 ** self.t)
+        self.m_w = self.beta_1 * self.m_w + (1 - self.beta_1) * grad_weight
+        self.v_w = self.beta_2 * self.v_w + (1 - self.beta_2) * (grad_weight ** 2)
+        m_hat_w = self.m_w / (1 - self.beta_1 ** self.t)
+        v_hat_w = self.v_w / (1 - self.beta_2 ** self.t)
 
-        self.m_b = 0.9 * self.m_b + 0.1 * grad_bias
-        self.v_b = 0.999 * self.v_b + 0.001 * (grad_bias ** 2)
-        m_hat_b = self.m_b / (1 - 0.9 ** self.t)
-        v_hat_b = self.v_b / (1 - 0.999 ** self.t)
+        self.m_b = self.beta_1 * self.m_b + (1 - self.beta_1) * grad_bias
+        self.v_b = self.beta_2 * self.v_b + (1 - self.beta_2) * (grad_bias ** 2)
+        m_hat_b = self.m_b / (1 - self.beta_1 ** self.t)
+        v_hat_b = self.v_b / (1 - self.beta_2 ** self.t)
 
-        self.weight -= self.learning_factor * m_hat_w / (np.sqrt(v_hat_w) + 1e-8)
-        self.bias -= self.learning_factor * m_hat_b / (np.sqrt(v_hat_b) + 1e-8)
+        self.weight -= self.learning_factor * m_hat_w / (np.sqrt(v_hat_w) + self.epsilon)
+        self.bias -= self.learning_factor * m_hat_b / (np.sqrt(v_hat_b) + self.epsilon)
 
         self.gradient = np.dot(old_weight.T, last_gradient)
         return self.gradient
-
-    def set_batch_size(self, batch_size):
-        self.batch_size = batch_size
-        self.learning_factor = self.learning_rate / batch_size
-
 
 class LatentLayer:
     def __init__(self, input_dim=1, output_dim=1, learning_rate=0.001):

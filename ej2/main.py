@@ -85,17 +85,16 @@ if __name__ == "__main__":
     main_activator = activators.activator_functions[config["activator"]]
     last_activator = activators.activator_functions[config["output_activator"]]
 
+    num_interpolations = config.get("num_interpolations", 15)
+    interpolation_steps = config.get("interpolation_steps", 10)
+
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = os.path.join("results", timestamp)
     os.makedirs(output_dir, exist_ok=True)
-    shutil.copy(config, os.path.join(output_dir, "config.json"))
+    shutil.copy(sys.argv[1], os.path.join(output_dir, "config.json"))
 
-
-    emoji_indexes = np.array([0, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 19, 23, 24, 26,
-                              28, 29, 31, 32, 33, 35, 36, 38, 39, 41, 46, 48, 50, 51, 54, 55,
-                              57, 58, 59, 61, 62, 63, 64, 65, 67, 73, 75, 78, 81, 83, 84, 85,
-                              90, 91, 92, 93, 95])
+    emoji_indexes = np.array(config.get("emoji_indexes", list(range(len(emoji_images)))))
 
     data = np.array(emoji_images)
     dataset_input = data[emoji_indexes]
@@ -112,9 +111,9 @@ if __name__ == "__main__":
         show_comparison(list(dataset_input)[i], output, i, output_dir)
 
 
-    for interpolation_idx in range(15):
+    for interpolation_idx in range(num_interpolations):
 
-        n = 10
+        n = interpolation_steps
         digit_size = INPUT_ROWS
         images = np.zeros((INPUT_ROWS, INPUT_COLS * n))
 

@@ -4,9 +4,7 @@ def mse(y, a):
     temp = a - y
     return (1.0 / (2.0 * y.shape[1])) * np.sum(temp ** 2)
 
-
 def mse_derivative(y, a):
-    # return (a - y) / y.shape[1]
     return (1. / y.shape[1]) * np.sum(a - y, axis=1).reshape((y.shape[0],1))
 
 class MultiLayerPerceptron:
@@ -47,20 +45,16 @@ class MultiLayerPerceptron:
                     output_layer=False,
                 )
 
-    def train(self, dataset_input, dataset_output, epochs=1, batch_size=1):
-        for layer in self.layers:
-            layer.set_batch_size(batch_size)
+    def train(self, dataset_input, dataset_output, epochs=1):
 
-        samples_processed = 0
         for epoch in range(epochs):
             for i in range(len(dataset_input)):
-                input_batch = np.reshape(dataset_input[i], (len(dataset_input[i]), batch_size))
-                output_batch = np.reshape(dataset_output[i], (len(dataset_output[i]), batch_size))
+                input_batch = np.reshape(dataset_input[i], (len(dataset_input[i])))
+                output_batch = np.reshape(dataset_output[i], (len(dataset_output[i])))
 
                 self.feedforward(input_batch)
                 self.backpropagate(output_batch)
 
-                samples_processed += batch_size
 
 
 class VariationalAutoencoder(MultiLayerPerceptron):
@@ -84,6 +78,6 @@ class VariationalAutoencoder(MultiLayerPerceptron):
         sampler_gradient = self.latent.backpropagate(decoder_gradient)
         self.encoder.backpropagate(sampler_gradient, use_loss=False)
 
-    def train(self, dataset_input, dataset_test=None, epochs=1, batch_size=1):
-        super().train(dataset_input=dataset_input, dataset_output=dataset_input, epochs=epochs, batch_size=batch_size)
+    def train(self, dataset_input, epochs=1):
+        super().train(dataset_input=dataset_input, dataset_output=dataset_input, epochs=epochs)
 
