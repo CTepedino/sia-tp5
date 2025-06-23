@@ -60,6 +60,16 @@ class Layer:
         self.gradient = np.dot(old_weight.T, last_gradient)
         return self.gradient
 
+    def get_parameters(self):
+        return {
+            "weight": self.weight,
+            "bias": self.bias
+        }
+
+    def set_parameters(self, params):
+        self.weight = params["weight"]
+        self.bias = params["bias"]
+
 
 class LatentLayer:
     def __init__(self, input_dim=1, output_dim=1, learning_rate=0.001):

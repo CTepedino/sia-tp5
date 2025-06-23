@@ -135,7 +135,12 @@ if __name__ == "__main__":
 
     vae = build_vae(INPUT_SIZE, hidden_sizes, main_activator, learning_rate, latent_size, last_activator)
 
+    # Para cargar los pesos de un archivo en lugar de reentrenar
+    # vae.load_weights("vae_weights.npz")
+
     vae.train(dataset_input=dataset_input_list, epochs=epochs)
+
+    vae.save_weights(os.path.join(output_dir,"vae_weights.npz"))
 
     save_emoji_grid(dataset_input_list, os.path.join(output_dir, "emoji_grid.png"))
 
@@ -153,6 +158,7 @@ if __name__ == "__main__":
         reconstructions.append(output.flatten())
 
     save_emoji_grid(reconstructions, os.path.join(output_dir, "vae_recon_grid.png"))
+
 
     for interpolation_idx in range(num_interpolations):
 
@@ -198,7 +204,7 @@ if __name__ == "__main__":
         latent_coords = np.array(latent_coords)
 
         # Gráfico del espacio latente
-        plt.figure(figsize=(6, 6))
+        plt.figure(figsize=(10,10))
         sns.scatterplot(x=latent_coords[:, 0], y=latent_coords[:, 1], hue=emoji_indexes, palette='tab10', s=100)
         plt.title("Espacio latente (2D) del VAE")
         plt.xlabel("Dim 1")
@@ -222,7 +228,6 @@ if __name__ == "__main__":
     plt.title("Distribución del error de reconstrucción (MSE)")
     plt.xlabel("Error de reconstrucción (MSE)")
     plt.ylabel("Cantidad de emojis")
-    plt.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "reconstruction_mse_histogram.png"))
     plt.close()

@@ -46,6 +46,19 @@ class MultiLayerPerceptron:
                     output_layer=False,
                 )
 
+    def save_weights(self, filename):
+        params = {}
+        for i, layer in enumerate(self.layers):
+            params[f"weight_{i}"] = layer.weight
+            params[f"bias_{i}"] = layer.bias
+        np.savez(filename, **params)
+
+    def load_weights(self, filename):
+        data = np.load(filename)
+        for i, layer in enumerate(self.layers):
+            layer.weight = data[f"weight_{i}"]
+            layer.bias = data[f"bias_{i}"]
+
     def train(self, dataset_input, dataset_output, epochs=1):
 
         for epoch in range(epochs):
