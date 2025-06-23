@@ -1,5 +1,5 @@
 import numpy as np
-from multilayer_perceptron_autoencoder import MultiLayerPerceptron
+from multilayer_perceptron import MultiLayerPerceptron
 import matplotlib.pyplot as plt
 from activatorFunctions import non_linear_functions
 import os
@@ -11,7 +11,6 @@ import sys
 import argparse
 
 
-# El Font3 original en decimal (cada número representa una fila de 5 bits)
 Font3 = [
     [0x04, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00],
     [0x0e, 0x01, 0x0d, 0x13, 0x13, 0x0d, 0x00],
@@ -59,13 +58,11 @@ def load_config(config_path):
         with open(config_path, 'r') as f:
             config = json.load(f)
         
-        # Validar configuración
         required_keys = ['layers', 'learning_rate', 'function', 'optimizer', 'loss_function', 'epochs', 'interpolation']
         for key in required_keys:
             if key not in config:
                 raise ValueError(f"Falta el parámetro '{key}' en la configuración")
         
-        # Validar parámetros de interpolación
         interpolation_keys = ['letra1_idx', 'letra2_idx', 'n_interpolations']
         for key in interpolation_keys:
             if key not in config['interpolation']:
@@ -82,7 +79,6 @@ def load_config(config_path):
         print(f"Error en la configuración: {e}")
         sys.exit(1)
 
-# Convertir Font3 a vectores binarios de 35 bits
 def font_to_binary_patterns():
     patterns = []
     for symbol in Font3:
@@ -129,17 +125,14 @@ def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_l
     print("GENERANDO NUEVAS LETRAS DESDE EL ESPACIO LATENTE")
     print("="*60)
     
-    # Obtener parámetros de interpolación del config
     letra1_idx = config['interpolation']['letra1_idx']
     letra2_idx = config['interpolation']['letra2_idx']
     n_interpolations = config['interpolation']['n_interpolations']
     
-    # Validar índices de letras
     if letra1_idx < 0 or letra1_idx >= len(letras) or letra2_idx < 0 or letra2_idx >= len(letras):
         print(f"Error: Los índices de letras deben estar entre 0 y {len(letras)-1}")
         return
     
-    # Obtener representaciones latentes de todas las letras
     z_list = []
     for letra in letras:
         _, activaciones = ae.forward_propagation(letra)
@@ -147,48 +140,38 @@ def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_l
     
     z = np.array(z_list)
     
-    # Función para generar una letra desde un punto en el espacio latente
     def generate_from_latent_point(latent_point):
         """Genera una letra desde un punto en el espacio latente usando solo el decoder"""
-        # Simular la propagación hacia adelante desde el espacio latente
         current_activation = np.array(latent_point)
         
-        # Comenzar desde la capa latente (índice 2 en la arquitectura [35, 17, 2, 17, 35])
         decoder_start = capa_latente
         
         for layer_idx in range(decoder_start, len(ae.weights)):
-            # Agregar bias
             current_activation_with_bias = np.append(current_activation, 1.0)
             layer_weights = np.array(ae.weights[layer_idx])
             
-            # Calcular salida de la capa
             h = np.dot(layer_weights, current_activation_with_bias)
             current_activation = np.array([ae.activator_function(x) for x in h])
         
         return current_activation.tolist()
     
-    # Interpolación lineal entre dos letras
     print(f"\nInterpolación lineal entre letras '{font3_chars[letra1_idx]}' y '{font3_chars[letra2_idx]}':")
     
     z1, z2 = z[letra1_idx], z[letra2_idx]
     
-    # Generar interpolaciones
     interpolated_letters = []
     
     fig, axs = plt.subplots(1, n_interpolations + 2, figsize=(15, 3))
     
-    # Mostrar letra original 1
     letra1_bin = (np.array(letras[letra1_idx]) > 0.5).astype(int)
     axs[0].imshow(letra1_bin.reshape(7, 5), cmap="binary")
     axs[0].set_title(f"'{font3_chars[letra1_idx]}' original")
     axs[0].axis("off")
     
-    # Generar interpolaciones
     for i in range(n_interpolations):
         alpha = (i + 1) / (n_interpolations + 1)
         interpolated_z = z1 * (1 - alpha) + z2 * alpha
         
-        # Generar letra desde el punto interpolado
         generated_letter = generate_from_latent_point(interpolated_z)
         generated_bin = (np.array(generated_letter) > 0.5).astype(int)
         interpolated_letters.append(generated_bin)
@@ -197,7 +180,6 @@ def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_l
         axs[i + 1].set_title(f"α={alpha:.2f}")
         axs[i + 1].axis("off")
     
-    # Mostrar letra original 2
     letra2_bin = (np.array(letras[letra2_idx]) > 0.5).astype(int)
     axs[-1].imshow(letra2_bin.reshape(7, 5), cmap="binary")
     axs[-1].set_title(f"'{font3_chars[letra2_idx]}' original")
@@ -207,7 +189,6 @@ def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_l
     plt.savefig(os.path.join(results_directory, "interpolacion_lineal.png"))
     plt.show()
     
-    # Guardar las letras interpoladas en un archivo CSV
     with open(os.path.join(results_directory, "letras_interpoladas.csv"), "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Interpolación", "Alpha", "Bits generados"])
@@ -220,10 +201,8 @@ def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_l
 
 def entrenar_autoencoder(results_directory, config):
     letras = font_to_binary_patterns()
-    # Elegir la función de activación por nombre
     activador, activador_deriv = non_linear_functions[config["function"]]
 
-    # Guardar parámetros en JSON
     params = {
         "layers": config["layers"],
         "learning_rate": config["learning_rate"],
@@ -239,13 +218,11 @@ def entrenar_autoencoder(results_directory, config):
     with open(os.path.join(results_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
 
-    # Guardar/cargar los pesos en la carpeta 'weights/'
     weights_dir = 'weights'
     os.makedirs(weights_dir, exist_ok=True)
     arch_str = '-'.join(str(x) for x in params["layers"])
     weights_path = os.path.join(weights_dir, f"MLP_{arch_str}_autoencoder.npy")
 
-    # Crear el modelo
     ae = MultiLayerPerceptron(
         layers=params["layers"],
         learning_rate=params["learning_rate"],
@@ -255,7 +232,6 @@ def entrenar_autoencoder(results_directory, config):
         loss_function=params["loss_function"]
     )
 
-    # Intentar cargar pesos
     if os.path.exists(weights_path):
         print(f"Cargando pesos desde: {weights_path}")
         ae.weights = list(np.load(weights_path, allow_pickle=True))
@@ -263,7 +239,6 @@ def entrenar_autoencoder(results_directory, config):
     else:
         print("No se encontraron pesos previos. Se entrenará desde cero.")
 
-    # Siempre entrenar (continuar o desde cero)
     ae.train(letras, letras, epochs=config["epochs"])
     np.save(weights_path, np.array(ae.weights, dtype=object))
     print(f"Pesos guardados en: {weights_path}")
@@ -279,7 +254,6 @@ def entrenar_autoencoder(results_directory, config):
         log_and_print(f"Error máximo por letra: {max(errores_por_letra)}", f)
         log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
 
-        # Gráfico de barras de distribución de errores
         error_counts = Counter(errores_por_letra)
         
         plt.figure(figsize=(10, 6))
@@ -293,7 +267,6 @@ def entrenar_autoencoder(results_directory, config):
         plt.xticks(errors)
         plt.grid(True, alpha=0.3)
         
-        # Agregar etiquetas de valor en las barras
         for i, (error, count) in enumerate(zip(errors, counts)):
             plt.text(error, count + 0.1, str(count), ha='center', va='bottom')
         
@@ -301,26 +274,20 @@ def entrenar_autoencoder(results_directory, config):
         plt.savefig(os.path.join(results_directory, "distribucion_errores.png"))
         plt.show()
 
-        # Visualizamos espacio latente
         z_list = []
         for letra in letras:
             _, activaciones = ae.forward_propagation(letra)
             z_list.append(activaciones[capa_latente])
 
         z = np.array(z_list)
-        # z_min = z.min(axis=0)
-        # z_max = z.max(axis=0)
-        # z_norm = (z - z_min) / (z_max - z_min)
         plt.scatter(z[:, 0], z[:, 1])
         for i in range(len(z)):
             plt.annotate(font3_chars[i], (z[i, 0], z[i, 1]))
         plt.title("Representación en el espacio latente (2D)")
         plt.grid(True)
-        # Guardar el gráfico
         plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
         plt.show()
 
-    # Guardar resultados de letras predichas
     letras_reconstruidas = []
     with open(os.path.join(results_directory, "resultado_letras.csv"), "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -329,27 +296,22 @@ def entrenar_autoencoder(results_directory, config):
             reconstruida = ae.test(letra)
             reconstruida_bin = (np.array(reconstruida) > 0.5).astype(int)
             letras_reconstruidas.append(reconstruida_bin)
-            # Como string de 0s y 1s
             bits_str = ''.join(str(bit) for bit in reconstruida_bin)
             writer.writerow([font3_chars[idx], bits_str])
 
-    # Graficar todas las letras reconstruidas
     plot_all_letters(np.array(letras_reconstruidas), results_directory)
 
     generate_new_letters_from_latent_space(ae, letras, results_directory, capa_latente, config)
 
 if __name__ == "__main__":
-    # Configurar argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Entrenar autoencoder y generar nuevas letras')
     parser.add_argument('config', help='Ruta al archivo de configuración JSON')
     parser.add_argument('--output-dir', '-o', help='Directorio de salida (opcional, por defecto se crea automáticamente)')
     
     args = parser.parse_args()
     
-    # Cargar configuración
     config = load_config(args.config)
     
-    # Crear directorio de resultados
     if args.output_dir:
         results_directory = args.output_dir
     else:
@@ -357,7 +319,6 @@ if __name__ == "__main__":
     
     os.makedirs(results_directory, exist_ok=True)
     
-    # Mostrar configuración cargada
     print("Configuración cargada:")
     print(f"- Arquitectura: {config['layers']}")
     print(f"- Learning rate: {config['learning_rate']}")
@@ -370,5 +331,4 @@ if __name__ == "__main__":
     print(f"- Directorio de resultados: {results_directory}")
     print("-" * 60)
     
-    # Entrenar autoencoder
     entrenar_autoencoder(results_directory, config)
