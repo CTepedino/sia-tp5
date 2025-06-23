@@ -64,24 +64,24 @@ class MultiLayerPerceptron:
 
 
 class VariationalAutoencoder(MultiLayerPerceptron):
-    def __init__(self, encoder, sampler, decoder):
+    def __init__(self, encoder, latent, decoder):
         super().__init__()
 
-        self.layers = encoder.layers + [sampler.mean, sampler.log_var] + decoder.layers
+        self.layers = encoder.layers + [latent.mean, latent.log_var] + decoder.layers
         self.encoder = encoder
-        self.sampler = sampler
+        self.latent = latent
         self.decoder = decoder
 
     def feedforward(self, input_data):
         encoder_output = self.encoder.feedforward(input_data)
-        sample = self.sampler.feedforward(encoder_output)
+        sample = self.latent.feedforward(encoder_output)
         decoder_output = self.decoder.feedforward(sample)
         return decoder_output
 
     def backpropagate(self, target_output, use_loss=False):
         self.decoder.backpropagate(target_output)
         decoder_gradient = self.decoder.layers[0].gradient
-        sampler_gradient = self.sampler.backpropagate(decoder_gradient)
+        sampler_gradient = self.latent.backpropagate(decoder_gradient)
         self.encoder.backpropagate(sampler_gradient, use_loss=False)
 
     def train(self, dataset_input, dataset_test=None, epochs=1, batch_size=1):
