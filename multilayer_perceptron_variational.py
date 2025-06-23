@@ -221,49 +221,86 @@ class VariationalAutoencoder:
 
     def reparameterize(self, mu, logvar):
         epsilon = np.random.normal(size=mu.shape)
-        return mu + np.exp(0.5 * logvar) * epsilon
+        z = mu + np.exp(0.5 * logvar) * epsilon
+        return z, epsilon
 
     def loss(self, x_true, x_recon, mu, logvar):
         x_true = np.array(x_true)
         x_recon = np.array(x_recon)
-        # MSE reconstrucción
-        recon_loss = 0.5 * np.sum((x_true - x_recon) ** 2)
-        # KL Divergence entre N(mu, sigma) y N(0, 1)
-        kl_div = -0.5 * np.sum(1 + logvar - mu**2 - np.exp(logvar))
-        return recon_loss + kl_div, recon_loss, kl_div
+
+        # MSE reconstrucción por dimensión
+        recon_loss = 0.5 * np.mean((x_true - x_recon) ** 2)
+
+        # KL Divergence promedio por dimensión
+        kl_div = -0.5 * np.mean(1 + logvar - mu ** 2 - np.exp(logvar))
+
+        total = recon_loss + kl_div
+        return total, recon_loss, kl_div
 
     def forward(self, x):
         _, _, (mu, logvar) = self.encoder.forward_propagation(x)
         mu = np.array(mu)
-        logvar = np.array(logvar)
-        z = self.reparameterize(mu, logvar)
+        logvar = np.clip(np.array(logvar), -10, 10)  # evita overflows numéricos
+        z, epsilon = self.reparameterize(mu, logvar)
         _, activations = self.decoder.forward_propagation(z)
         x_recon = activations[-1]
-        return x_recon, mu, logvar
+        return x_recon, mu, logvar, z, epsilon
 
-    def train(self, dataset, epochs):
+    def train(self, dataset, epochs=100, verbose=True):
+        self.loss_history = []
+
         for epoch in range(epochs):
             total_loss = 0
             total_kl = 0
             total_recon = 0
 
             for x in dataset:
-                x_recon, mu, logvar = self.forward(x)
-                total, recon_loss, kl_div = self.loss(x, x_recon, mu, logvar)
-                total_loss += total
+                # === FORWARD ===
+                x_recon, mu, logvar, z, epsilon = self.forward(x)
+                loss, recon_loss, kl_div = self.loss(x, x_recon, mu, logvar)
+
+                total_loss += loss
                 total_recon += recon_loss
                 total_kl += kl_div
 
-                # Backpropagation decoder
-                z = self.reparameterize(mu, logvar)
+                # === BACKPROPAGATION DECODER ===
                 self.decoder.back_propagation(x, *self.decoder.forward_propagation(z)[:2])
 
-                # Backpropagation encoder
-                target = (mu.tolist() + logvar.tolist())
+                # === BACKPROPAGATION ENCODER ===
+                # Paso 1: forward decoder con z
+                hidden_states, activations = self.decoder.forward_propagation(z)
+                output = activations[-1]
+                error = output - np.array(x)
+
+                # Paso 2: delta capa de salida
+                delta_out = error * np.array([self.decoder.activator_derivative(h) for h in hidden_states[-1]])
+
+                # Paso 3: propagar hacia capa anterior
+                W_out = np.array(self.decoder.weights[-1])[:, :-1]
+                delta_hidden = W_out.T @ delta_out
+
+                # Paso 4: propagar hasta z
+                W0 = np.array(self.decoder.weights[0])[:, :-1]
+                dz = W0.T @ delta_hidden
+
+                # === Gradientes KL ===
+                mu = np.array(mu)
+                logvar = np.clip(np.array(logvar), -10, 10)
+                dmu = dz + mu  # ∂L/∂mu
+                dlogvar = dz * epsilon * 0.5 * np.exp(0.5 * logvar) + 0.5 * (np.exp(logvar) - 1)
+
+                # === BACKPROP ENCODER ===
+                target = np.concatenate([mu - dmu, logvar - dlogvar])
                 self.encoder.back_propagation(target, *self.encoder.forward_propagation(x)[:2])
 
             n = len(dataset)
-            print(f"[Epoch {epoch+1}] Total: {total_loss/n:.4f} | Recon: {total_recon/n:.4f} | KL: {total_kl/n:.4f}")
+            avg_loss = total_loss / n
+            avg_recon = total_recon / n
+            avg_kl = total_kl / n
+            self.loss_history.append(avg_loss)
+
+            if verbose:
+                print(f"[Epoch {epoch + 1:3}] Total: {avg_loss:.6f} | Recon: {avg_recon:.6f} | KL: {avg_kl:.6f}")
 
     def encode(self, x):
         _, _, (mu, logvar) = self.encoder.forward_propagation(x)
