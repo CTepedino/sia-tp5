@@ -1,17 +1,19 @@
-import os
 import copy
+
 import numpy as np
-from datetime import datetime
+
 
 class MultiLayerPerceptron:
     def __init__(self, layers, learning_rate, activator_function, activator_derivative=lambda x: 1,
-                 optimizer="gradient", adaptive_lr=True, loss_function="mse"):
+                 optimizer="gradient", adaptive_lr=True, loss_function="mse", noise_function=None, noise_level=None):
         self.layers = layers
         self.learning_rate = learning_rate
         self.initial_learning_rate = learning_rate  
         self.optimizer = optimizer
         self.loss_function = loss_function
 
+        self.noise_function = noise_function
+        self.noise_level = noise_level
         
         self.activator_function = activator_function
         self.activator_derivative = activator_derivative
@@ -182,10 +184,15 @@ class MultiLayerPerceptron:
             self.m = [np.zeros_like(np.array(w)) for w in self.weights]
             self.v = [np.zeros_like(np.array(w)) for w in self.weights]
 
+        noiseless_training_set = copy.deepcopy(training_set)
+
         for epoch in range(epochs):
             error = 0
             np.random.seed(epoch)
             indices = np.random.permutation(len(training_set))
+
+            if self.noise_function is not None:
+                training_set = self.noise_function(noiseless_training_set, self.noise_level)
 
             for idx in indices:
                 x = training_set[idx]
@@ -261,3 +268,4 @@ class MultiLayerPerceptron:
             return (predicted - target) / (predicted * (1 - predicted))
         else:
             raise ValueError(f"Función de pérdida '{self.loss_function}' no soportada")
+
