@@ -1,4 +1,30 @@
 
+# TP5 - SIA - Grupo 1
+
+## Requisitos
+
+- Python 3.8 o superior
+- uv: gestor de entornos y dependencias
+
+### Instalación de uv:
+
+```bash
+curl -Ls https://astral.sh/uv/install.sh | sh
+```
+
+### Sincronización de dependencias:
+
+Este proyecto incluye un archivo requirements.txt. Para instalar todo con uv, ejecutar:
+
+```bash
+uv venv .venv  
+uv sync
+```
+
+Esto crea el entorno virtual en .venv e instala automáticamente las dependencias necesarias.
+
+---
+
 # Autoencoder Variacional para Generación de Emojis
 
 Este proyecto implementa un **autoencoder variacional (VAE)** que entrena con un conjunto de emojis y permite visualizar el espacio latente, reconstruir los emojis originales y generar nuevos mediante interpolación entre embeddings.

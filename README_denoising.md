@@ -1,6 +1,33 @@
+
+# TP5 - SIA - Grupo 1
+
+## Requisitos
+
+- Python 3.8 o superior
+- uv: gestor de entornos y dependencias
+
+### Instalación de uv:
+
+```bash
+curl -Ls https://astral.sh/uv/install.sh | sh
+```
+
+### Sincronización de dependencias:
+
+Este proyecto incluye un archivo requirements.txt. Para instalar todo con uv, ejecutar:
+
+```bash
+uv venv .venv  
+uv sync
+```
+
+Esto crea el entorno virtual en .venv e instala automáticamente las dependencias necesarias.
+
+---
+
 # Autoencoder de Denoising para Letras
 
-Este proyecto implementa un autoencoder de denoising que puede limpiar letras ruidosas y reconstruir las letras originales del conjunto Font3.
+Este proyecto implementa un autoencoder de denoising que intenta limpiar letras ruidosas y reconstruir las letras originales del conjunto Font3.
 
 ## Configuración
 
@@ -113,7 +140,6 @@ Los resultados se guardan en el directorio especificado:
 - **Entrada**: Letras con ruido (píxeles modificados aleatoriamente)
 - **Objetivo**: Letras originales sin ruido
 - **Propósito**: Aprender a limpiar ruido y reconstruir la información original
-- **Aplicación**: Útil para sistemas que deben manejar datos corruptos o ruidosos
 
 ## Notas
 
