@@ -121,10 +121,7 @@ def generate_new_letters_from_latent_space(ae, letras, results_directory, capa_l
     """
     Genera nuevas letras interpolando en el espacio latente entre letras existentes
     """
-    print("\n" + "="*60)
-    print("GENERANDO NUEVAS LETRAS DESDE EL ESPACIO LATENTE")
-    print("="*60)
-    
+
     letra1_idx = config['interpolation']['letra1_idx']
     letra2_idx = config['interpolation']['letra2_idx']
     n_interpolations = config['interpolation']['n_interpolations']
@@ -318,17 +315,4 @@ if __name__ == "__main__":
         results_directory = "results/result_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     
     os.makedirs(results_directory, exist_ok=True)
-    
-    print("Configuración cargada:")
-    print(f"- Arquitectura: {config['layers']}")
-    print(f"- Learning rate: {config['learning_rate']}")
-    print(f"- Función de activación: {config['function']}")
-    print(f"- Optimizador: {config['optimizer']}")
-    print(f"- Función de pérdida: {config['loss_function']}")
-    print(f"- Épocas: {config['epochs']}")
-    print(f"- Interpolación: letra {config['interpolation']['letra1_idx']} ({font3_chars[config['interpolation']['letra1_idx']]}) a letra {config['interpolation']['letra2_idx']} ({font3_chars[config['interpolation']['letra2_idx']]})")
-    print(f"- Número de interpolaciones: {config['interpolation']['n_interpolations']}")
-    print(f"- Directorio de resultados: {results_directory}")
-    print("-" * 60)
-    
     entrenar_autoencoder(results_directory, config)

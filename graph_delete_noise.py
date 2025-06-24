@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Datos de entrada
+# Datos de mediciones
 pixeles_modificados = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35]
 promedio_error_por_letra = [2.8, 5.84, 10.125, 10.375, 13.375, 14.281, 16.375, 17.375, 18.215, 21.5, 20.22, 20.34, 19.15, 17.84, 18.81, 18.87, 18.5,19.12]
 

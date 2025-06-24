@@ -182,14 +182,6 @@ class MultiLayerPerceptron:
             self.m = [np.zeros_like(np.array(w)) for w in self.weights]
             self.v = [np.zeros_like(np.array(w)) for w in self.weights]
 
-        print(f"Iniciando entrenamiento con {epochs} épocas...")
-        print(f"Optimizador: {self.optimizer}")
-        print(f"Learning rate inicial: {self.initial_learning_rate}")
-        print(f"Learning rate adaptativo: {'Sí' if self.adaptive_lr else 'No'}")
-        print(f"Función de pérdida: {self.loss_function}")
-        print(f"Arquitectura: {self.layers}")
-        print("-" * 50)
-
         for epoch in range(epochs):
             error = 0
             np.random.seed(epoch)

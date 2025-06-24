@@ -1,5 +1,5 @@
 {
-    "layers": [35, 17, 2, 17, 35],
+    "layers": [35, 14, 2, 14, 35],
     "learning_rate": 0.009,
     "function": "sigmoid",
     "optimizer": "adam",

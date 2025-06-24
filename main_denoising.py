@@ -267,7 +267,7 @@ def entrenar_autoencoder(results_directory, config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Entrenar autoencoder de denoising')
-    parser.add_argument('--config', '-c', default='configs/config_denoising.json', help='Ruta al archivo de configuración JSON')
+    parser.add_argument('config', help='Ruta al archivo de configuración JSON')
     parser.add_argument('--output-dir', '-o', help='Directorio de salida (opcional, por defecto se crea automáticamente)')
     
     args = parser.parse_args()
@@ -280,16 +280,4 @@ if __name__ == "__main__":
         results_directory = "results/result_denoising_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     
     os.makedirs(results_directory, exist_ok=True)
-    
-    print("Configuración cargada:")
-    print(f"- Arquitectura: {config['layers']}")
-    print(f"- Learning rate: {config['learning_rate']}")
-    print(f"- Función de activación: {config['function']}")
-    print(f"- Optimizador: {config['optimizer']}")
-    print(f"- Función de pérdida: {config['loss_function']}")
-    print(f"- Épocas: {config['epochs']}")
-    print(f"- Píxeles de ruido: {config['n_pixeles_ruido']}")
-    print(f"- Directorio de resultados: {results_directory}")
-    print("-" * 60)
-    
     entrenar_autoencoder(results_directory, config)
