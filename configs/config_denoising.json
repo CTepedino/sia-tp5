@@ -1,11 +1,11 @@
 {
     "latent_size": 2,
-    "hidden_layers": [35, 14],
+    "hidden_layers": [35, 18],
     "learning_rate": 0.009,
     "function": "sigmoid",
     "optimizer": "adam",
     "loss_function": "binary_crossentropy",
     "epochs": 5000,
-    "noise_function": "gaussian_binarized",
+    "noise_function": "gaussian",
     "noise_level": 0.2
 } 

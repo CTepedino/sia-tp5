@@ -112,18 +112,6 @@ def pixel_noise(letters, n_pixels):
         noisy_letters.append(noisy)
     return noisy_letters
 
-def gaussian_noise_binarized(letters, std):
-    noisy_letters = []
-    for letter in letters:
-        letter = np.array(letter, dtype=np.float32)
-        noise = np.random.normal(loc=0.0, scale=std, size=letter.shape)
-        noisy = letter + noise
-        noisy = np.clip(noisy, 0.0, 1.0)
-        noisy = (noisy >= 0.5).astype(np.uint8)
-        noisy_letters.append(noisy)
-    return noisy_letters
-
-
 def gaussian_noise(letters, std):
     noisy_letters = []
     for letter in letters:
@@ -137,31 +125,26 @@ def gaussian_noise(letters, std):
 noise_functions = {
     "pixel": pixel_noise,
     "gaussian": gaussian_noise,
-    "gaussian_binarized": gaussian_noise_binarized
 }
 
 noise_error_functions = {
     "pixel": pixel_difference,
-    "gaussian_binarized": pixel_difference,
-    "gaussian": mean_squared_error
+    "gaussian": pixel_difference
 }
 
 noise_error_unit = {
     "pixel": "píxeles",
-    "gaussian_binarized": "píxeles",
-    "gaussian": "MSE"
+    "gaussian": "píxeles"
 }
 
 noise_level_unit_multiplier = {
     "pixel": 1,
-    "gaussian_binarized": 0.1,
     "gaussian": 0.1
 }
 
 should_binarize_output = {
     "pixel": True,
-    "gaussian_binarized": True,
-    "gaussian": False
+    "gaussian": True
 }
 
 if __name__ == "__main__":
