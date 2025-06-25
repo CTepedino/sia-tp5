@@ -6,6 +6,6 @@
     "optimizer": "adam",
     "loss_function": "binary_crossentropy",
     "epochs": 5000,
-    "noise_function": "gaussian",
-    "noise_level": 0.3
+    "noise_function": "gaussian_binarized",
+    "noise_level": 0.2
 } 
