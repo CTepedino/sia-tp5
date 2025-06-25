@@ -227,10 +227,13 @@ if __name__ == "__main__":
             plot_all_letters(noisy_letters, results_directory, filename=f"noisy_letters_{next_noise:.2f}.png", titulo=f"Conjunto de letras con ruido {next_noise}")
 
             errores_por_letra = []
+            unbinarized_reconstructions = []
             reconstructions = []
             for idx, letter in enumerate(letters):
 
                 reconstruida = dae.test(noisy_letters[idx])
+
+                unbinarized_reconstructions.append(reconstruida)
 
                 if binarize_output:
                     reconstruida = (np.array(reconstruida) >= 0.5).astype(np.uint8)
@@ -247,6 +250,7 @@ if __name__ == "__main__":
             log_and_print(f"Error promedio por letra: {np.mean(errores_por_letra):.6f}", f)
 
             plot_all_letters(np.array(reconstructions), results_directory, filename=f"reconstructions_{next_noise:.2f}.png", titulo=f"Conjunto de reconstrucciones con ruido {next_noise}")
+            plot_all_letters(np.array(unbinarized_reconstructions), results_directory, filename=f"unbinarized_reconstructions_{next_noise:.2f}.png", titulo=f"Conjunto de reconstrucciones con ruido {next_noise}")
 
             error_counts = Counter(errores_por_letra)
 
