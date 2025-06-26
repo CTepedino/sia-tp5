@@ -101,7 +101,8 @@ def plot_all_letters(data, results_directory, filename=None, titulo=None):
         fig.savefig(os.path.join(results_directory, filename))
     else:
         fig.savefig(os.path.join(results_directory, "letter_map.png"))
-    plt.show()
+    #plt.show()
+    plt.close()
 
 def pixel_noise(letters, n_pixels):
     noisy_letters = []
@@ -122,29 +123,47 @@ def gaussian_noise(letters, std):
         noisy_letters.append(noisy)
     return noisy_letters
 
+def salt_and_pepper_noise(letters, prob):
+    noisy_letters = []
+    for letter in letters:
+        noisy = np.array(letter).copy()
+        mask = np.random.rand(len(noisy))
+        salt = (mask < prob / 2)
+        pepper = (mask > 1 - prob / 2)
+        noisy[salt] = 1
+        noisy[pepper] = 0
+        noisy_letters.append(noisy)
+    return noisy_letters
+
+
 noise_functions = {
     "pixel": pixel_noise,
     "gaussian": gaussian_noise,
+    "salt_and_pepper": salt_and_pepper_noise
 }
 
 noise_error_functions = {
     "pixel": pixel_difference,
-    "gaussian": pixel_difference
+    "gaussian": pixel_difference,
+    "salt_and_pepper": pixel_difference
 }
 
 noise_error_unit = {
     "pixel": "píxeles",
-    "gaussian": "píxeles"
+    "gaussian": "píxeles",
+    "salt_and_pepper": "pixeles"
 }
 
 noise_level_unit_multiplier = {
     "pixel": 1,
-    "gaussian": 0.1
+    "gaussian": 0.1,
+    "salt_and_pepper": 0.05
 }
 
 should_binarize_output = {
     "pixel": True,
-    "gaussian": True
+    "gaussian": True,
+    "salt_and_pepper": True
 }
 
 if __name__ == "__main__":
@@ -202,6 +221,9 @@ if __name__ == "__main__":
         noise_level=noise_level
     )
 
+        #Cargo pesos de AE de igual arquitectura
+    # dae.load_weights_from_file("./weights/MLP_35-18-2-18-35_autoencoder.npy")
+
     dae.train(letters, letters, epochs=epochs)
 
     np.save(weights_path, np.array(dae.weights, dtype=object))
@@ -220,7 +242,7 @@ if __name__ == "__main__":
     with open(os.path.join(results_directory, "result_log.txt"), "w") as f:
         #genero datasets con distintos niveles de ruido y pruebo el dae
         for test_noise_lv in range(0, 11):
-            next_noise = noise_lv_multiplier * test_noise_lv #pixeles -> [0 a 10], gauss -> [0.0 a 1]
+            next_noise = noise_lv_multiplier * test_noise_lv #pixeles -> [0 a 10], gauss -> [0.0 a 1], s-p -> [0 a 0.05]
 
             noisy_letters = noise_fn(letters, next_noise)
 
@@ -271,7 +293,8 @@ if __name__ == "__main__":
 
             plt.tight_layout()
             plt.savefig(os.path.join(results_directory, f"distribucion_errores_{next_noise:.2f}.png"))
-            plt.show()
+            plt.close()
+           # plt.show()
 
 
     # Visualizamos espacio latente
@@ -287,7 +310,8 @@ if __name__ == "__main__":
     plt.title("Representación en el espacio latente")
     plt.grid(True)
     plt.savefig(os.path.join(results_directory, "espacio_latente.png"))
-    plt.show()
+   # plt.show()
+    plt.close()
 
 
 

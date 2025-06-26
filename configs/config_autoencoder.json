@@ -4,7 +4,7 @@
     "function": "sigmoid",
     "optimizer": "adam",
     "loss_function": "binary_crossentropy",
-    "epochs": 5000,
+    "epochs": 12000,
     "interpolation": {
         "letra1_idx": 9,
         "letra2_idx": 27,

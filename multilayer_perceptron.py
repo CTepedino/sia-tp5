@@ -192,6 +192,8 @@ class MultiLayerPerceptron:
             indices = np.random.permutation(len(training_set))
 
             if self.noise_function is not None:
+                # random_noise_level = np.random.uniform(0, 0.15)
+                # training_set = self.noise_function(noiseless_training_set, random_noise_level)
                 training_set = self.noise_function(noiseless_training_set, self.noise_level)
 
             for idx in indices:
@@ -269,3 +271,7 @@ class MultiLayerPerceptron:
         else:
             raise ValueError(f"Función de pérdida '{self.loss_function}' no soportada")
 
+    def load_weights_from_file(self, file_path):
+        loaded = np.load(file_path, allow_pickle=True)
+
+        self.weights = [np.array(w).tolist() for w in loaded]
